@@ -118,7 +118,7 @@ export default async function Home() {
       </section>
 
       {/* How it works */}
-      <section className="mb-16 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 p-6 sm:p-10">
+      <section className="mb-16 rounded-2xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/30 p-6 sm:p-10">
         <div className="text-center mb-10">
           <p className="text-xs font-semibold tracking-widest text-cyan-500 dark:text-cyan-400 mb-2">HOW IT WORKS</p>
           <h2 className="text-2xl sm:text-3xl font-bold">4 단계, 30 분.</h2>
@@ -169,7 +169,7 @@ function Metric({ value, label }: { value: string; label: string }) {
 
 function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
-    <div className="group rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700/40 p-6 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/5 transition">
+    <div className="group rounded-xl border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-600/40 p-6 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/5 transition">
       <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500 dark:text-cyan-400 group-hover:scale-110 transition">
         {icon}
       </div>
@@ -182,7 +182,7 @@ function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: stri
 function Step({ n, title, desc }: { n: number; title: string; desc: string }) {
   return (
     <li className="relative">
-      <div className="rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700/40 p-5 h-full">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-600/40 p-5 h-full">
         <div className="flex items-center gap-3 mb-3">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500 text-slate-950 text-sm font-bold">
             {n}

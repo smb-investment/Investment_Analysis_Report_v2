@@ -18,15 +18,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="ko">
       <body>
         <nav className="border-b border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-black/30 backdrop-blur">
-          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-            <Link href="/" className="font-semibold">Investment Analysis Report</Link>
-            <div className="flex items-center gap-4 text-sm">
+          <div className="max-w-5xl mx-auto px-4 py-5 flex items-center justify-between gap-6 flex-wrap">
+            <Link href="/" className="text-2xl sm:text-3xl font-bold tracking-tight">Investment Analysis Report</Link>
+            <div className="flex items-center gap-5 sm:gap-7 text-lg sm:text-2xl">
               {isApproved && <Link href="/reports" className="hover:underline">보고서</Link>}
               {isApproved && <Link href="/board" className="hover:underline">게시판</Link>}
               {isAdmin && <Link href="/admin" className="hover:underline">어드민</Link>}
               {user ? (
                 <>
-                  <span className="text-gray-500">{profile?.email ?? user.email}</span>
+                  <span className="text-gray-500 text-base sm:text-lg">{profile?.email ?? user.email}</span>
                   <SignOutButton />
                 </>
               ) : (
@@ -37,7 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </nav>
         <main className="max-w-5xl mx-auto px-4 py-8">{children}</main>
         <footer className="border-t border-gray-200 dark:border-gray-800 mt-16">
-          <div className="max-w-5xl mx-auto px-4 py-6 text-xs text-gray-500 leading-relaxed">
+          <div className="max-w-5xl mx-auto px-4 py-8 text-base sm:text-2xl text-gray-500 leading-relaxed">
             본 자료는 정보 제공 목적이며 투자자문·권유가 아닙니다. 투자 판단과 책임은 이용자 본인에게 있습니다.
           </div>
         </footer>
