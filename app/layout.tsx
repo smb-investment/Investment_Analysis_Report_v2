@@ -5,7 +5,7 @@ import { getSessionContext } from "@/lib/auth";
 import SignOutButton from "@/components/SignOutButton";
 
 export const metadata: Metadata = {
-  title: "Investment Proposal",
+  title: "Investment Analysis Report",
   description: "회원제 투자 분석 보고서 열람",
 };
 
@@ -19,7 +19,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <nav className="border-b border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-black/30 backdrop-blur">
           <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-            <Link href="/" className="font-semibold">Investment Proposal</Link>
+            <Link href="/" className="font-semibold">Investment Analysis Report</Link>
             <div className="flex items-center gap-4 text-sm">
               {isApproved && <Link href="/reports" className="hover:underline">보고서</Link>}
               {isApproved && <Link href="/board" className="hover:underline">게시판</Link>}

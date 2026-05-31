@@ -41,7 +41,7 @@ export default async function Home() {
             공시 자료를 던지면 <span className="text-white font-semibold">Claude AI</span>가
             <span className="text-white font-semibold"> 산업·재무·리스크·밸류에이션·M&amp;A 시나리오</span>까지
             <br className="hidden sm:block" />
-            <span className="text-cyan-300 font-semibold">9 섹션 IC 부의자료</span>를 30~60분 안에 작성합니다.
+            <span className="text-cyan-300 font-semibold">9 섹션 IC 부의자료</span>를 30분 안에 작성합니다.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
@@ -86,7 +86,7 @@ export default async function Home() {
           {/* 신뢰 지표 */}
           <div className="mt-12 grid grid-cols-3 gap-4 max-w-2xl">
             <Metric value="9" label="Sections" />
-            <Metric value="30~60" label="Minutes" />
+            <Metric value="30" label="Minutes" />
             <Metric value="0" label="API Costs (구독제)" />
           </div>
         </div>
@@ -118,10 +118,10 @@ export default async function Home() {
       </section>
 
       {/* How it works */}
-      <section className="mb-16 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-6 sm:p-10">
+      <section className="mb-16 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 p-6 sm:p-10">
         <div className="text-center mb-10">
           <p className="text-xs font-semibold tracking-widest text-cyan-500 dark:text-cyan-400 mb-2">HOW IT WORKS</p>
-          <h2 className="text-2xl sm:text-3xl font-bold">4 단계, 30~60 분.</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold">4 단계, 30 분.</h2>
         </div>
         <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <Step n={1} title="자료 업로드" desc="DART 분기보고서, IR 자료, IM 등 PDF를 어드민이 업로드 (≤20MB)." />
@@ -169,7 +169,7 @@ function Metric({ value, label }: { value: string; label: string }) {
 
 function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
-    <div className="group rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-6 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/5 transition">
+    <div className="group rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700/40 p-6 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/5 transition">
       <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500 dark:text-cyan-400 group-hover:scale-110 transition">
         {icon}
       </div>
@@ -182,7 +182,7 @@ function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: stri
 function Step({ n, title, desc }: { n: number; title: string; desc: string }) {
   return (
     <li className="relative">
-      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-5 h-full">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700/40 p-5 h-full">
         <div className="flex items-center gap-3 mb-3">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500 text-slate-950 text-sm font-bold">
             {n}
