@@ -35,6 +35,43 @@ const STATUS_LABEL: Record<ProfileRow["status"], string> = {
   rejected: "거부",
 };
 
+const REPORT_STATUS_LABEL: Record<ReportRow["status"], string> = {
+  intake: "분석대기",
+  draft: "초안",
+  published: "게시",
+};
+
+const REPORT_STATUS_TONE: Record<ReportRow["status"], string> = {
+  intake: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+  draft: "bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300",
+  published: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+};
+
+const PROFILE_STATUS_TONE: Record<ProfileRow["status"], string> = {
+  pending: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+  approved: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+  rejected: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
+};
+
+const PALETTES = [
+  "from-cyan-500 to-sky-600",
+  "from-indigo-500 to-violet-600",
+  "from-emerald-500 to-teal-600",
+  "from-amber-500 to-orange-600",
+  "from-rose-500 to-pink-600",
+  "from-fuchsia-500 to-purple-600",
+];
+function paletteFor(name: string | null | undefined): string {
+  if (!name) return PALETTES[0];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return PALETTES[h % PALETTES.length];
+}
+function initialOf(name: string | null | undefined): string {
+  if (!name) return "·";
+  return name.charAt(0).toUpperCase();
+}
+
 export default async function AdminPage({ searchParams }: { searchParams: { error?: string } }) {
   const ctx = await requireAdmin();
   if (ctx.error) redirect("/login");
@@ -59,74 +96,157 @@ export default async function AdminPage({ searchParams }: { searchParams: { erro
 
   return (
     <section className="space-y-10">
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">어드민 콘솔</h1>
-        <Link href="/admin/reports/new" className="px-3 py-1.5 rounded-md bg-black text-white dark:bg-white dark:text-black text-sm">
-          + 자료수집 업로드
-        </Link>
+      {/* 헤더 */}
+      <div>
+        <p className="text-xs font-semibold tracking-widest text-cyan-500 dark:text-cyan-400 mb-2">
+          ADMIN CONSOLE
+        </p>
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">어드민 콘솔</h1>
+          <Link
+            href="/admin/reports/new"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-cyan-500 hover:bg-cyan-400 transition text-slate-950 font-semibold shadow-md shadow-cyan-500/20"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            자료수집 업로드
+          </Link>
+        </div>
       </div>
 
       {searchParams.error && (
-        <div className="rounded-md border border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800 p-3 text-sm">
-          {searchParams.error}
+        <div className="rounded-lg border border-red-400/40 bg-red-50/80 dark:bg-red-950/30 dark:border-red-800/60 p-4 text-sm text-red-800 dark:text-red-200">
+          오류: {searchParams.error}
         </div>
       )}
 
-      {/* 회원 승인 대기 */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">승인 대기 ({pendingMembers.length})</h2>
-        {pendingMembers.length === 0 ? (
-          <div className="text-sm text-gray-500">대기 중인 회원이 없습니다.</div>
-        ) : (
-          <ul className="divide-y divide-gray-200 dark:divide-gray-800 border border-gray-200 dark:border-gray-800 rounded-md">
-            {pendingMembers.map((p) => (
-              <li key={p.id} className="p-3 flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{p.email}</div>
-                  <div className="text-xs text-gray-500">{formatDateTime(p.created_at)}</div>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <form action={setMemberStatus}>
-                    <input type="hidden" name="id" value={p.id} />
-                    <input type="hidden" name="status" value="approved" />
-                    <button className="px-3 py-1 rounded-md bg-green-600 text-white text-xs">승인</button>
-                  </form>
-                  <form action={setMemberStatus}>
-                    <input type="hidden" name="id" value={p.id} />
-                    <input type="hidden" name="status" value="rejected" />
-                    <button className="px-3 py-1 rounded-md bg-red-600 text-white text-xs">거부</button>
-                  </form>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+      {/* 통계 카드 */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <StatCard label="승인 대기" value={pendingMembers.length} tone="amber" />
+        <StatCard label="전체 회원" value={profiles.length} tone="cyan" />
+        <StatCard label="보고서" value={reports.length} tone="emerald" />
+        <StatCard label="최근 게시글" value={posts.length} tone="violet" />
       </div>
 
-      {/* 전체 회원 (재변경용) */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">전체 회원 ({otherMembers.length})</h2>
-        {otherMembers.length === 0 ? (
-          <div className="text-sm text-gray-500">없음</div>
+      {/* 승인 대기 */}
+      <Panel title="승인 대기" count={pendingMembers.length}>
+        {pendingMembers.length === 0 ? (
+          <EmptyMini text="대기 중인 회원이 없습니다." />
         ) : (
-          <ul className="divide-y divide-gray-200 dark:divide-gray-800 border border-gray-200 dark:border-gray-800 rounded-md">
-            {otherMembers.map((p) => (
-              <li key={p.id} className="p-3 flex items-center justify-between gap-4">
+          <ul className="divide-y divide-slate-200 dark:divide-slate-600">
+            {pendingMembers.map((p) => {
+              const palette = paletteFor(p.email);
+              return (
+                <li key={p.id} className="py-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`shrink-0 h-9 w-9 rounded-lg bg-gradient-to-br ${palette} text-white font-semibold text-sm flex items-center justify-center shadow`}>
+                      {initialOf(p.email)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{p.email}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{formatDateTime(p.created_at)}</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <form action={setMemberStatus}>
+                      <input type="hidden" name="id" value={p.id} />
+                      <input type="hidden" name="status" value="approved" />
+                      <button className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold transition">
+                        승인
+                      </button>
+                    </form>
+                    <form action={setMemberStatus}>
+                      <input type="hidden" name="id" value={p.id} />
+                      <input type="hidden" name="status" value="rejected" />
+                      <button className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-rose-500 hover:bg-rose-400 text-white text-xs font-semibold transition">
+                        거부
+                      </button>
+                    </form>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
+
+      {/* 전체 회원 */}
+      <Panel title="전체 회원" count={otherMembers.length}>
+        {otherMembers.length === 0 ? (
+          <EmptyMini text="회원이 없습니다." />
+        ) : (
+          <ul className="divide-y divide-slate-200 dark:divide-slate-600">
+            {otherMembers.map((p) => {
+              const palette = paletteFor(p.email);
+              return (
+                <li key={p.id} className="py-3 flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`shrink-0 h-9 w-9 rounded-lg bg-gradient-to-br ${palette} text-white font-semibold text-sm flex items-center justify-center shadow`}>
+                      {initialOf(p.email)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{p.email}</div>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-medium ${PROFILE_STATUS_TONE[p.status]}`}>
+                          {STATUS_LABEL[p.status]}
+                        </span>
+                        {p.role === "admin" && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300 font-medium">admin</span>
+                        )}
+                        <span>· {formatDateTime(p.created_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    {(["pending", "approved", "rejected"] as const)
+                      .filter((s) => s !== p.status)
+                      .map((s) => (
+                        <form action={setMemberStatus} key={s}>
+                          <input type="hidden" name="id" value={p.id} />
+                          <input type="hidden" name="status" value={s} />
+                          <button className="px-2.5 py-1 rounded-md border border-slate-300 dark:border-slate-500 hover:border-cyan-500/60 hover:text-cyan-600 dark:hover:text-cyan-400 text-xs font-medium transition">
+                            → {STATUS_LABEL[s]}
+                          </button>
+                        </form>
+                      ))}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
+
+      {/* 보고서 */}
+      <Panel title="보고서" count={reports.length}>
+        {reports.length === 0 ? (
+          <EmptyMini text="아직 보고서가 없습니다." />
+        ) : (
+          <ul className="divide-y divide-slate-200 dark:divide-slate-600">
+            {reports.map((r) => (
+              <li key={r.id} className="py-3 flex items-center justify-between gap-4 flex-wrap">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{p.email}</div>
-                  <div className="text-xs text-gray-500">
-                    role={p.role} · status=<span className="font-mono">{STATUS_LABEL[p.status]}</span> · {formatDateTime(p.created_at)}
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{r.title || r.company || "(제목 없음)"}</div>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-medium ${REPORT_STATUS_TONE[r.status]}`}>
+                      {REPORT_STATUS_LABEL[r.status]}
+                    </span>
+                    {r.company && <span>{r.company}</span>}
+                    {r.period && <span>· {r.period}</span>}
+                    <span>· {formatDateTime(r.created_at)}</span>
                   </div>
                 </div>
-                <div className="flex gap-1 shrink-0 text-xs">
-                  {(["pending", "approved", "rejected"] as const)
-                    .filter((s) => s !== p.status)
+                <div className="flex gap-1 shrink-0">
+                  {(["intake", "draft", "published"] as const)
+                    .filter((s) => s !== r.status)
                     .map((s) => (
-                      <form action={setMemberStatus} key={s}>
-                        <input type="hidden" name="id" value={p.id} />
+                      <form action={setReportStatus} key={s}>
+                        <input type="hidden" name="id" value={r.id} />
                         <input type="hidden" name="status" value={s} />
-                        <button className="px-2 py-1 rounded border border-gray-300 dark:border-gray-700">
-                          → {STATUS_LABEL[s]}
+                        <button className="px-2.5 py-1 rounded-md border border-slate-300 dark:border-slate-500 hover:border-cyan-500/60 hover:text-cyan-600 dark:hover:text-cyan-400 text-xs font-medium transition">
+                          → {REPORT_STATUS_LABEL[s]}
                         </button>
                       </form>
                     ))}
@@ -135,61 +255,27 @@ export default async function AdminPage({ searchParams }: { searchParams: { erro
             ))}
           </ul>
         )}
-      </div>
-
-      {/* 보고서 상태 토글 */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">보고서 ({reports.length})</h2>
-        {reports.length === 0 ? (
-          <div className="text-sm text-gray-500">아직 보고서가 없습니다.</div>
-        ) : (
-          <ul className="divide-y divide-gray-200 dark:divide-gray-800 border border-gray-200 dark:border-gray-800 rounded-md">
-            {reports.map((r) => (
-              <li key={r.id} className="p-3 flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{r.title || r.company || "(제목 없음)"}</div>
-                  <div className="text-xs text-gray-500">
-                    {[r.company, r.period].filter(Boolean).join(" · ") || "—"} · status=<span className="font-mono">{r.status}</span>{" · "}
-                    {formatDateTime(r.created_at)}
-                  </div>
-                </div>
-                <div className="flex gap-1 shrink-0 text-xs">
-                  {(["intake", "draft", "published"] as const)
-                    .filter((s) => s !== r.status)
-                    .map((s) => (
-                      <form action={setReportStatus} key={s}>
-                        <input type="hidden" name="id" value={r.id} />
-                        <input type="hidden" name="status" value={s} />
-                        <button className="px-2 py-1 rounded border border-gray-300 dark:border-gray-700">→ {s}</button>
-                      </form>
-                    ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      </Panel>
 
       {/* 게시판 모더레이션 */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">최근 게시글 (모더레이션)</h2>
+      <Panel title="최근 게시글" count={posts.length} hint="(모더레이션)">
         {posts.length === 0 ? (
-          <div className="text-sm text-gray-500">게시글이 없습니다.</div>
+          <EmptyMini text="게시글이 없습니다." />
         ) : (
-          <ul className="divide-y divide-gray-200 dark:divide-gray-800 border border-gray-200 dark:border-gray-800 rounded-md">
+          <ul className="divide-y divide-slate-200 dark:divide-slate-600">
             {posts.map((p) => (
-              <li key={p.id} className="p-3 flex items-center justify-between gap-4">
+              <li key={p.id} className="py-3 flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <Link href={`/board/${p.id}`} className="text-sm font-medium truncate hover:underline">
+                  <Link href={`/board/${p.id}`} className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate hover:text-cyan-600 dark:hover:text-cyan-400 transition">
                     {p.title}
                   </Link>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     {p.author?.email ?? "(알 수 없음)"} · {formatDateTime(p.created_at)}
                   </div>
                 </div>
                 <form action={adminDeletePost}>
                   <input type="hidden" name="id" value={p.id} />
-                  <button className="px-2 py-1 rounded-md border border-red-300 text-red-700 dark:border-red-800 dark:text-red-300 text-xs">
+                  <button className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-rose-300/60 text-rose-700 dark:border-rose-700/60 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-medium transition">
                     삭제
                   </button>
                 </form>
@@ -197,7 +283,43 @@ export default async function AdminPage({ searchParams }: { searchParams: { erro
             ))}
           </ul>
         )}
-      </div>
+      </Panel>
     </section>
+  );
+}
+
+function StatCard({ label, value, tone }: { label: string; value: number; tone: "amber" | "cyan" | "emerald" | "violet" }) {
+  const tones = {
+    amber: "from-amber-500/15 to-amber-500/5 border-amber-500/30 text-amber-700 dark:text-amber-300",
+    cyan: "from-cyan-500/15 to-cyan-500/5 border-cyan-500/30 text-cyan-700 dark:text-cyan-300",
+    emerald: "from-emerald-500/15 to-emerald-500/5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300",
+    violet: "from-violet-500/15 to-violet-500/5 border-violet-500/30 text-violet-700 dark:text-violet-300",
+  };
+  return (
+    <div className={`rounded-xl border bg-gradient-to-br p-4 ${tones[tone]}`}>
+      <div className="text-xs font-semibold tracking-wider uppercase opacity-80">{label}</div>
+      <div className="mt-1 text-3xl font-bold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function Panel({ title, count, hint, children }: { title: string; count: number; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700/30 p-5 sm:p-6">
+      <h2 className="text-lg font-bold mb-4 flex items-baseline gap-2">
+        {title}
+        <span className="text-cyan-500 dark:text-cyan-400 tabular-nums">{count}</span>
+        {hint && <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">{hint}</span>}
+      </h2>
+      {children}
+    </div>
+  );
+}
+
+function EmptyMini({ text }: { text: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-600 px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+      {text}
+    </div>
   );
 }
