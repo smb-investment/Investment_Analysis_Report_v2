@@ -1,0 +1,235 @@
+/* report-theme.css — 자가완결형 보고서 스타일. 외부 폰트/추적기 없음. */
+
+:root {
+  --fg: #1f2937;
+  --fg-soft: #4b5563;
+  --fg-muted: #6b7280;
+  --bg: #ffffff;
+  --bg-soft: #f9fafb;
+  --bg-code: #f3f4f6;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --accent: #1e40af;
+  --accent-soft: #dbeafe;
+  --warn: #b45309;
+  --warn-soft: #fef3c7;
+  --max: 880px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic",
+               -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+main.report {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 48px 32px 96px;
+}
+
+/* 제목 */
+.report h1 {
+  font-size: 1.9rem;
+  line-height: 1.35;
+  margin: 0 0 12px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--accent);
+}
+.report h2 {
+  font-size: 1.45rem;
+  margin: 36px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.report h3 {
+  font-size: 1.15rem;
+  margin: 24px 0 8px;
+  color: var(--accent);
+}
+.report h4 {
+  font-size: 1.0rem;
+  margin: 18px 0 6px;
+  color: var(--fg-soft);
+}
+
+.report p { margin: 8px 0 14px; }
+
+/* 본문 머리 메타 (작성일, 대상 등) */
+.report > p:first-of-type,
+.report > p:nth-of-type(2),
+.report > p:nth-of-type(3),
+.report > p:nth-of-type(4) {
+  color: var(--fg-soft);
+  font-size: 0.95rem;
+}
+
+.report strong { color: var(--fg); }
+.report em { color: var(--fg-soft); }
+
+/* 목록 */
+.report ul, .report ol {
+  margin: 6px 0 14px;
+  padding-left: 1.4em;
+}
+.report li { margin: 4px 0; }
+.report li > p { margin: 4px 0; }
+
+/* 체크박스 (GFM) */
+.report input[type="checkbox"] {
+  margin-right: 6px;
+  vertical-align: middle;
+  transform: translateY(-1px);
+}
+.report .task-list-item { list-style: none; }
+.report .task-list-item-checkbox { margin-left: -1.4em; }
+
+/* 인용 */
+.report blockquote {
+  margin: 14px 0;
+  padding: 12px 16px;
+  background: var(--bg-soft);
+  border-left: 3px solid var(--accent);
+  color: var(--fg-soft);
+}
+
+/* 코드 */
+.report code {
+  background: var(--bg-code);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-family: "JetBrains Mono", "Consolas", "Menlo", monospace;
+  font-size: 0.92em;
+}
+.report pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+.report pre code { background: transparent; padding: 0; }
+
+/* 표 */
+.report table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0 20px;
+  font-size: 0.95rem;
+}
+.report th, .report td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  vertical-align: top;
+  text-align: left;
+}
+.report thead th {
+  background: var(--bg-soft);
+  font-weight: 600;
+  color: var(--fg);
+}
+.report tbody tr:nth-child(even) { background: var(--bg-soft); }
+
+/* 강조 박스 */
+.report .note,
+.report blockquote.note {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+  color: var(--fg);
+}
+.report .warn,
+.report blockquote.warn {
+  background: var(--warn-soft);
+  border-left-color: var(--warn);
+  color: var(--warn);
+}
+
+/* 가로 분리선 */
+.report hr {
+  border: 0;
+  border-top: 1px solid var(--border-strong);
+  margin: 36px 0;
+}
+
+/* 링크 */
+.report a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.report a:hover { text-decoration-thickness: 2px; }
+
+/* 면책 (마지막 이탤릭 단락) */
+.report > em:last-child,
+.report > p:last-of-type em {
+  display: block;
+  margin-top: 36px;
+  padding: 14px 16px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  color: var(--fg-muted);
+}
+
+/* 화면용 다크모드 (이메일/사이트 임베드 시) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #e5e7eb;
+    --fg-soft: #d1d5db;
+    --fg-muted: #9ca3af;
+    --bg: #0b1020;
+    --bg-soft: #111827;
+    --bg-code: #1f2937;
+    --border: #374151;
+    --border-strong: #4b5563;
+    --accent: #93c5fd;
+    --accent-soft: #1e3a8a;
+    --warn: #fbbf24;
+    --warn-soft: #78350f;
+  }
+}
+
+/* 인쇄·PDF 저장 */
+@media print {
+  @page {
+    size: A4;
+    margin: 18mm 16mm 20mm 16mm;
+  }
+  :root {
+    --fg: #000;
+    --fg-soft: #222;
+    --fg-muted: #555;
+    --bg: #fff;
+    --bg-soft: #fafafa;
+    --bg-code: #f5f5f5;
+    --border: #999;
+    --border-strong: #666;
+    --accent: #003a8c;
+    --accent-soft: #e6f0fb;
+  }
+  html, body { background: #fff !important; color: #000 !important; }
+  main.report {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    font-size: 11pt;
+    line-height: 1.55;
+  }
+  .report h1 { page-break-before: avoid; }
+  .report h2 { page-break-before: auto; page-break-after: avoid; }
+  .report h3, .report h4 { page-break-after: avoid; }
+  .report table, .report blockquote, .report pre, .report img,
+  .report tr, .report .keep { page-break-inside: avoid; }
+  .report a { color: #000; text-decoration: none; }
+  .report a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 9pt; color: #555; }
+}
