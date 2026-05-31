@@ -9,6 +9,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { createClient } = require("@supabase/supabase-js");
 
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -16,6 +17,10 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("실행 예: node --env-file=agent/.env agent/push.js <reportId>");
   process.exit(2);
 }
+
+const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false },
+});
 
 const args = process.argv.slice(2);
 const reportId = args.find((a) => !a.startsWith("--"));
@@ -50,15 +55,16 @@ async function patchJSON(url, body) {
 }
 
 async function uploadObject(bucket, objectPath, buf, contentType) {
-  const url = `${STORAGE}/object/${bucket}/${objectPath}`;
-  // upsert via x-upsert: true to overwrite if a previous draft exists
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { ...H, "Content-Type": contentType, "x-upsert": "true" },
-    body: buf,
+  // Supabase Storage 는 upsert 시 기존 metadata(Content-Type 등)를 보존하므로,
+  // 안전하게 remove → upload (insert) 순서로 진행.
+  await sb.storage.from(bucket).remove([objectPath]); // 없으면 no-op
+  const { data, error } = await sb.storage.from(bucket).upload(objectPath, buf, {
+    contentType,
+    upsert: false,
+    cacheControl: "no-cache",
   });
-  if (!r.ok) throw new Error(`upload ${url} → ${r.status} ${await r.text()}`);
-  return r.json();
+  if (error) throw new Error(`upload ${bucket}/${objectPath} → ${error.message}`);
+  return data;
 }
 
 function extractTitleAndSummary(mdText) {

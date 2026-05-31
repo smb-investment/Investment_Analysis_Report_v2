@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatDateTime } from "@/lib/format";
-import PrintClient from "./PrintClient";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +11,23 @@ async function getSigned(
   supabase: ReturnType<typeof createSupabaseServerClient>,
   bucket: string,
   path: string | null,
-  download = false,
+  download: boolean | string = false,
 ): Promise<string | null> {
   if (!path) return null;
   const { data } = await supabase.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL, { download });
   return data?.signedUrl ?? null;
+}
+
+// Storage 가 HTML 파일 Content-Type 을 text/plain 으로 sniffing 하는 이슈 우회.
+// 본문을 직접 다운로드해 iframe srcdoc 으로 렌더.
+async function fetchHtmlBody(
+  supabase: ReturnType<typeof createSupabaseServerClient>,
+  path: string | null,
+): Promise<string | null> {
+  if (!path) return null;
+  const { data, error } = await supabase.storage.from("reports-html").download(path);
+  if (error || !data) return null;
+  return await data.text();
 }
 
 export default async function ReportViewerPage({ params }: { params: { id: string } }) {
@@ -31,9 +42,11 @@ export default async function ReportViewerPage({ params }: { params: { id: strin
 
   if (error || !report) notFound();
 
-  const [htmlUrl, mdUrl] = await Promise.all([
-    getSigned(supabase, "reports-html", report.html_path),
-    getSigned(supabase, "reports-md", report.md_path, true),
+  const safeName = (report.company || report.title || "report").replace(/[^가-힣A-Za-z0-9_-]/g, "_");
+  const [htmlBody, htmlDownloadUrl, mdDownloadUrl] = await Promise.all([
+    fetchHtmlBody(supabase, report.html_path),
+    getSigned(supabase, "reports-html", report.html_path, `${safeName}.html`),
+    getSigned(supabase, "reports-md", report.md_path, `${safeName}.md`),
   ]);
 
   return (
@@ -48,10 +61,34 @@ export default async function ReportViewerPage({ params }: { params: { id: strin
           </div>
         </div>
         <div className="flex gap-2 no-print">
-          {mdUrl && (
-            <a href={mdUrl} download className="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 text-sm">MD</a>
+          {htmlDownloadUrl && (
+            <a
+              href={htmlDownloadUrl}
+              download
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-cyan-500 hover:bg-cyan-400 transition text-slate-950 text-sm font-semibold"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              HTML
+            </a>
           )}
-          <PrintClient />
+          {mdDownloadUrl && (
+            <a
+              href={mdDownloadUrl}
+              download
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition text-sm font-medium"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              MD
+            </a>
+          )}
         </div>
       </div>
 
@@ -61,11 +98,11 @@ export default async function ReportViewerPage({ params }: { params: { id: strin
         </div>
       )}
 
-      {htmlUrl ? (
+      {htmlBody ? (
         <div className="border border-gray-200 dark:border-gray-800 rounded-md overflow-hidden bg-white">
           <iframe
-            src={htmlUrl}
-            sandbox="allow-same-origin"
+            srcDoc={htmlBody}
+            sandbox="allow-same-origin allow-popups"
             className="w-full"
             style={{ height: "80vh", border: 0 }}
             title="보고서 본문"
