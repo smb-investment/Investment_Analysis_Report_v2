@@ -24,17 +24,16 @@ export default async function ReportViewerPage({ params }: { params: { id: strin
 
   const { data: report, error } = await supabase
     .from("reports")
-    .select("id,title,company,ticker,period,summary,status,md_path,html_path,pdf_path,model_used,web_search_used,created_at")
+    .select("id,title,company,ticker,period,summary,status,md_path,html_path,model_used,web_search_used,created_at")
     .eq("id", params.id)
     .eq("status", "published")
     .maybeSingle();
 
   if (error || !report) notFound();
 
-  const [htmlUrl, mdUrl, pdfUrl] = await Promise.all([
+  const [htmlUrl, mdUrl] = await Promise.all([
     getSigned(supabase, "reports-html", report.html_path),
     getSigned(supabase, "reports-md", report.md_path, true),
-    getSigned(supabase, "reports-pdf", report.pdf_path, true),
   ]);
 
   return (
@@ -49,9 +48,6 @@ export default async function ReportViewerPage({ params }: { params: { id: strin
           </div>
         </div>
         <div className="flex gap-2 no-print">
-          {pdfUrl && (
-            <a href={pdfUrl} download className="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 text-sm">PDF</a>
-          )}
           {mdUrl && (
             <a href={mdUrl} download className="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 text-sm">MD</a>
           )}

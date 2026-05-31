@@ -1,18 +1,20 @@
-/* report-theme.css — 자가완결형 보고서 스타일. 외부 폰트/추적기 없음. */
+/* report-theme.css — 자가완결형 보고서 스타일.
+   원칙: 흰 배경 고정 · 글자 딥블루/검정 · Pretendard 폰트 · 외부 폰트/추적기 미사용. */
 
 :root {
-  --fg: #1f2937;
-  --fg-soft: #4b5563;
-  --fg-muted: #6b7280;
-  --bg: #ffffff;
-  --bg-soft: #f9fafb;
-  --bg-code: #f3f4f6;
-  --border: #e5e7eb;
-  --border-strong: #d1d5db;
-  --accent: #1e40af;
-  --accent-soft: #dbeafe;
-  --warn: #b45309;
-  --warn-soft: #fef3c7;
+  --fg: #0b1220;            /* 본문 — 거의 검정 (살짝 청기) */
+  --fg-soft: #1e293b;       /* 부제 · 메타 — slate-800 */
+  --fg-muted: #475569;      /* 약한 텍스트 — slate-600 */
+  --bg: #ffffff;            /* 흰 배경 고정 */
+  --bg-soft: #f8fafc;       /* 강조 박스 / 표 줄무늬 — slate-50 */
+  --bg-code: #f1f5f9;       /* code 배경 — slate-100 */
+  --border: #cbd5e1;        /* slate-300 */
+  --border-strong: #94a3b8; /* slate-400 */
+  --accent: #1e3a8a;        /* 딥블루 — 제목 · 강조 (blue-900) */
+  --accent-strong: #1e40af; /* blue-800 */
+  --accent-soft: #dbeafe;   /* blue-100 — note 배경 */
+  --warn: #92400e;          /* amber-800 */
+  --warn-soft: #fef3c7;     /* amber-100 */
   --max: 880px;
 }
 
@@ -23,8 +25,9 @@ html, body {
   padding: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: "Pretendard", "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic",
-               -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Pretendard", "Pretendard Variable", "Apple SD Gothic Neo",
+               -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Malgun Gothic", sans-serif;
   font-size: 15px;
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
@@ -39,30 +42,37 @@ main.report {
 
 /* 제목 */
 .report h1 {
-  font-size: 1.9rem;
+  font-size: 1.95rem;
   line-height: 1.35;
   margin: 0 0 12px;
-  padding-bottom: 12px;
+  padding-bottom: 14px;
   border-bottom: 2px solid var(--accent);
+  color: var(--accent);
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 .report h2 {
   font-size: 1.45rem;
   margin: 36px 0 12px;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  font-weight: 700;
 }
 .report h3 {
   font-size: 1.15rem;
   margin: 24px 0 8px;
-  color: var(--accent);
+  color: var(--accent-strong);
+  font-weight: 700;
 }
 .report h4 {
   font-size: 1.0rem;
   margin: 18px 0 6px;
   color: var(--fg-soft);
+  font-weight: 600;
 }
 
-.report p { margin: 8px 0 14px; }
+.report p { margin: 8px 0 14px; color: var(--fg); }
 
 /* 본문 머리 메타 (작성일, 대상 등) */
 .report > p:first-of-type,
@@ -73,13 +83,14 @@ main.report {
   font-size: 0.95rem;
 }
 
-.report strong { color: var(--fg); }
+.report strong { color: var(--fg); font-weight: 700; }
 .report em { color: var(--fg-soft); }
 
 /* 목록 */
 .report ul, .report ol {
   margin: 6px 0 14px;
   padding-left: 1.4em;
+  color: var(--fg);
 }
 .report li { margin: 4px 0; }
 .report li > p { margin: 4px 0; }
@@ -109,6 +120,7 @@ main.report {
   border-radius: 4px;
   font-family: "JetBrains Mono", "Consolas", "Menlo", monospace;
   font-size: 0.92em;
+  color: var(--accent-strong);
 }
 .report pre {
   background: var(--bg-code);
@@ -117,7 +129,7 @@ main.report {
   padding: 12px 14px;
   overflow-x: auto;
 }
-.report pre code { background: transparent; padding: 0; }
+.report pre code { background: transparent; padding: 0; color: var(--fg); }
 
 /* 표 */
 .report table {
@@ -125,6 +137,7 @@ main.report {
   border-collapse: collapse;
   margin: 14px 0 20px;
   font-size: 0.95rem;
+  color: var(--fg);
 }
 .report th, .report td {
   border: 1px solid var(--border);
@@ -133,9 +146,9 @@ main.report {
   text-align: left;
 }
 .report thead th {
-  background: var(--bg-soft);
-  font-weight: 600;
-  color: var(--fg);
+  background: var(--accent-soft);
+  font-weight: 700;
+  color: var(--accent);
 }
 .report tbody tr:nth-child(even) { background: var(--bg-soft); }
 
@@ -162,11 +175,11 @@ main.report {
 
 /* 링크 */
 .report a {
-  color: var(--accent);
+  color: var(--accent-strong);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.report a:hover { text-decoration-thickness: 2px; }
+.report a:hover { text-decoration-thickness: 2px; color: var(--accent); }
 
 /* 면책 (마지막 이탤릭 단락) */
 .report > em:last-child,
@@ -181,41 +194,11 @@ main.report {
   color: var(--fg-muted);
 }
 
-/* 화면용 다크모드 (이메일/사이트 임베드 시) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fg: #e5e7eb;
-    --fg-soft: #d1d5db;
-    --fg-muted: #9ca3af;
-    --bg: #0b1020;
-    --bg-soft: #111827;
-    --bg-code: #1f2937;
-    --border: #374151;
-    --border-strong: #4b5563;
-    --accent: #93c5fd;
-    --accent-soft: #1e3a8a;
-    --warn: #fbbf24;
-    --warn-soft: #78350f;
-  }
-}
-
 /* 인쇄·PDF 저장 */
 @media print {
   @page {
     size: A4;
     margin: 18mm 16mm 20mm 16mm;
-  }
-  :root {
-    --fg: #000;
-    --fg-soft: #222;
-    --fg-muted: #555;
-    --bg: #fff;
-    --bg-soft: #fafafa;
-    --bg-code: #f5f5f5;
-    --border: #999;
-    --border-strong: #666;
-    --accent: #003a8c;
-    --accent-soft: #e6f0fb;
   }
   html, body { background: #fff !important; color: #000 !important; }
   main.report {
@@ -225,7 +208,7 @@ main.report {
     font-size: 11pt;
     line-height: 1.55;
   }
-  .report h1 { page-break-before: avoid; }
+  .report h1 { color: var(--accent); page-break-before: avoid; }
   .report h2 { page-break-before: auto; page-break-after: avoid; }
   .report h3, .report h4 { page-break-after: avoid; }
   .report table, .report blockquote, .report pre, .report img,
