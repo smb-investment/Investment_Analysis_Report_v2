@@ -26,7 +26,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {isAdmin && <Link href="/admin" className="hover:underline">어드민</Link>}
               {user ? (
                 <>
-                  <span className="text-gray-500 text-base sm:text-lg">{profile?.email ?? user.email}</span>
+                  <Link
+                    href="/account/password"
+                    title="비밀번호 변경"
+                    className="text-gray-500 text-base sm:text-lg hover:text-cyan-600 dark:hover:text-cyan-400 hover:underline transition"
+                  >
+                    {profile?.email ?? user.email}
+                  </Link>
                   <SignOutButton />
                 </>
               ) : (
