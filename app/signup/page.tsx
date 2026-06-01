@@ -13,6 +13,7 @@ export default function SignupPage({ searchParams }: { searchParams: { error?: s
         <div className="mb-4 rounded-md border border-green-300 bg-green-50 dark:bg-green-950/30 dark:border-green-800 p-3 text-sm">
           가입 요청을 받았습니다. Supabase 이메일 확인 정책이 켜져 있다면 메일함을 확인해 주세요.
           <br />이메일 확인 후에도 <b>어드민 승인</b>이 끝나야 보고서/게시판에 접근할 수 있습니다.
+          <br />어드민에게 가입 알림이 자동 발송되었습니다 — 보통 1영업일 이내 승인됩니다.
           <div className="mt-3"><Link href="/login" className="underline">로그인 페이지로</Link></div>
         </div>
       ) : (
