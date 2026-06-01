@@ -9,8 +9,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #1e293b;  /* slate-800 — 이전 #0b0f17(거의 검정)에서 약 30% 밝게 */
-    --foreground: #e5e7eb;
+    --background: #334155;  /* slate-700 — 한 단계 더 밝게 */
+    --foreground: #f1f5f9;
   }
 }
 

@@ -8,7 +8,7 @@ export default async function Home() {
   return (
     <div className="-mx-4 sm:-mx-0">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-slate-700 via-slate-600 to-slate-700 px-6 py-16 sm:py-24 mb-12">
+      <section className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-slate-600 via-slate-500 to-slate-600 px-6 sm:px-10 py-12 sm:py-16 mb-10">
         {/* 배경 그리드 패턴 */}
         <div
           aria-hidden
@@ -84,7 +84,7 @@ export default async function Home() {
           </div>
 
           {/* 신뢰 지표 */}
-          <div className="mt-12 grid grid-cols-3 gap-4 max-w-2xl">
+          <div className="mt-8 grid grid-cols-3 gap-4 max-w-2xl">
             <Metric value="9" label="Sections" />
             <Metric value="30" label="Minutes" />
             <Metric value="0" label="API Costs (구독제)" />
@@ -93,12 +93,12 @@ export default async function Home() {
       </section>
 
       {/* 핵심 기능 3개 */}
-      <section className="mb-16">
-        <div className="text-center mb-10">
+      <section className="mb-10">
+        <div className="text-center mb-6">
           <p className="text-xs font-semibold tracking-widest text-cyan-500 dark:text-cyan-400 mb-2">CORE CAPABILITIES</p>
           <h2 className="text-2xl sm:text-3xl font-bold">전문가 수준의 분석을, 자동으로.</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FeatureCard
             icon={<IconBrain />}
             title="AI 분석 엔진"
@@ -118,24 +118,24 @@ export default async function Home() {
       </section>
 
       {/* How it works */}
-      <section className="mb-16 rounded-2xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/30 p-6 sm:p-10">
-        <div className="text-center mb-10">
+      <section className="mb-10 rounded-2xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-600/30 p-5 sm:p-8">
+        <div className="text-center mb-6">
           <p className="text-xs font-semibold tracking-widest text-cyan-500 dark:text-cyan-400 mb-2">HOW IT WORKS</p>
           <h2 className="text-2xl sm:text-3xl font-bold">4 단계, 30 분.</h2>
         </div>
-        <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Step n={1} title="자료 업로드" desc="DART 분기보고서, IR 자료, IM 등 PDF를 어드민이 업로드 (≤20MB)." />
           <Step n={2} title="AI 분석" desc="Claude AI가 산업·재무·리스크·밸류에이션을 9 섹션으로 자동 작성." />
           <Step n={3} title="사람 검수" desc="어드민이 사실/추정·출처·면책 확인 후 게시 (published)." />
-          <Step n={4} title="회원 열람" desc="승인 회원이 보고서를 열람·MD/PDF 다운로드·인쇄." />
+          <Step n={4} title="회원 열람" desc="승인 회원이 보고서를 열람하고 HTML·MD 파일로 다운로드." />
         </ol>
       </section>
 
       {/* 최종 CTA (미로그인일 때만) */}
       {!user && (
-        <section className="rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-cyan-500/10 via-sky-500/10 to-indigo-500/10 p-8 sm:p-12 text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-3">지금 시작하세요</h2>
-          <p className="text-slate-600 dark:text-slate-300 mb-6 max-w-xl mx-auto">
+        <section className="rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-cyan-500/15 via-sky-500/15 to-indigo-500/15 p-7 sm:p-10 text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2">지금 시작하세요</h2>
+          <p className="text-slate-600 dark:text-slate-300 mb-5 max-w-xl mx-auto">
             가입 후 어드민 승인을 받으면 모든 보고서를 열람할 수 있습니다.
           </p>
           <div className="flex justify-center gap-3">
@@ -169,12 +169,12 @@ function Metric({ value, label }: { value: string; label: string }) {
 
 function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
-    <div className="group rounded-xl border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-600/40 p-6 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/5 transition">
-      <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-500 dark:text-cyan-400 group-hover:scale-110 transition">
+    <div className="group rounded-xl border border-slate-200 dark:border-slate-400 bg-white dark:bg-slate-500/40 p-5 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/10 transition">
+      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 group-hover:scale-110 transition">
         {icon}
       </div>
-      <h3 className="font-semibold text-lg mb-2">{title}</h3>
-      <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{desc}</p>
+      <h3 className="font-semibold text-base mb-1.5">{title}</h3>
+      <p className="text-sm text-slate-600 dark:text-slate-200 leading-relaxed">{desc}</p>
     </div>
   );
 }
@@ -182,14 +182,14 @@ function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: stri
 function Step({ n, title, desc }: { n: number; title: string; desc: string }) {
   return (
     <li className="relative">
-      <div className="rounded-xl border border-slate-200 dark:border-slate-500 bg-white dark:bg-slate-600/40 p-5 h-full">
-        <div className="flex items-center gap-3 mb-3">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500 text-slate-950 text-sm font-bold">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-400 bg-white dark:bg-slate-500/40 p-4 h-full">
+        <div className="flex items-center gap-2.5 mb-2">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-cyan-500 text-slate-950 text-sm font-bold shadow-md shadow-cyan-500/30">
             {n}
           </span>
-          <span className="font-semibold">{title}</span>
+          <span className="font-semibold text-sm">{title}</span>
         </div>
-        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{desc}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-200 leading-relaxed">{desc}</p>
       </div>
     </li>
   );

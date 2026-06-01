@@ -18,7 +18,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="ko">
       <body>
         <nav className="border-b border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-black/30 backdrop-blur">
-          <div className="max-w-5xl mx-auto px-4 py-5 flex items-center justify-between gap-6 flex-wrap">
+          <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between gap-6 flex-wrap">
             <Link href="/" className="text-2xl sm:text-3xl font-bold tracking-tight">Investment Analysis Report</Link>
             <div className="flex items-center gap-5 sm:gap-7 text-lg sm:text-2xl">
               {isApproved && <Link href="/reports" className="hover:underline">보고서</Link>}
@@ -35,9 +35,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           </div>
         </nav>
-        <main className="max-w-5xl mx-auto px-4 py-8">{children}</main>
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">{children}</main>
         <footer className="border-t border-gray-200 dark:border-gray-800 mt-16">
-          <div className="max-w-5xl mx-auto px-4 py-8 text-base sm:text-2xl text-gray-500 leading-relaxed">
+          <div className="max-w-6xl mx-auto px-4 py-6 text-xs sm:text-base text-slate-900 dark:text-white leading-relaxed">
             본 자료는 정보 제공 목적이며 투자자문·권유가 아닙니다. 투자 판단과 책임은 이용자 본인에게 있습니다.
           </div>
         </footer>
