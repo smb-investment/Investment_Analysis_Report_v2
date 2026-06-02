@@ -1,61 +1,60 @@
 @echo off
-chcp 65001 > nul
 setlocal enabledelayedexpansion
 
 echo.
 echo  ============================================================
-echo   Investment Analysis Daemon 설치
+echo   Investment Analysis Daemon - Install
 echo  ============================================================
 echo.
 
 cd /d "%~dp0"
 
-REM 1) Node.js 확인
+REM 1) Node.js check
 where node >nul 2>&1
 if errorlevel 1 (
-  echo  [!] Node.js 가 설치되어 있지 않거나 PATH 에 없습니다.
-  echo      https://nodejs.org 에서 LTS 버전을 먼저 설치하세요.
+  echo  [!] Node.js is not installed or not in PATH.
+  echo      Install LTS from https://nodejs.org first.
   echo.
   pause
   exit /b 1
 )
 
-REM 2) claude CLI 확인
+REM 2) claude CLI check
 where claude >nul 2>&1
 if errorlevel 1 (
-  echo  [!] claude CLI 가 설치되어 있지 않거나 PATH 에 없습니다.
-  echo      Claude Code 설치 후 다시 실행하세요.
+  echo  [!] claude CLI is not installed or not in PATH.
+  echo      Install Claude Code first.
   echo.
   pause
   exit /b 1
 )
 
-REM 3) .env 확인
+REM 3) .env check
 if not exist ".env" (
-  echo  [!] agent\.env 파일이 없습니다.
-  echo      SUPABASE_URL 과 SUPABASE_SERVICE_ROLE_KEY 가 들어있어야 합니다.
+  echo  [!] agent\.env not found.
+  echo      Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
   echo.
   pause
   exit /b 1
 )
 
-REM 4) 의존성 설치 (최초 1회만)
+REM 4) npm install (first time only)
 if not exist "node_modules" (
-  echo  [*] npm 의존성 설치 중...
+  echo  [*] Installing npm dependencies...
   call npm install
   if errorlevel 1 (
-    echo  [!] npm install 실패
+    echo  [!] npm install failed
     pause
     exit /b 1
   )
 )
 
-REM 5) 시작프로그램 폴더에 .lnk 단축키 생성
+REM 5) Create startup shortcut
 set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 set "DAEMON_BAT=%~dp0run-daemon.bat"
 set "LNK_PATH=%STARTUP%\InvestmentAnalysisDaemon.lnk"
 
-echo  [*] Windows 시작프로그램에 데몬 등록 중...
+echo  [*] Registering daemon in Windows Startup...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$s = New-Object -ComObject WScript.Shell;" ^
   "$sc = $s.CreateShortcut('%LNK_PATH%');" ^
@@ -66,42 +65,42 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$sc.Save()"
 
 if errorlevel 1 (
-  echo  [!] 시작프로그램 등록 실패
+  echo  [!] Failed to register startup shortcut
   pause
   exit /b 1
 )
 
-REM 6) 이미 떠 있는 데몬 종료 (있으면)
+REM 6) Kill any existing daemon
 if exist "daemon.pid" (
   set /p OLD_PID=<daemon.pid
   taskkill /PID !OLD_PID! /F >nul 2>&1
   del /f /q daemon.pid >nul 2>&1
 )
 
-REM 7) 데몬 즉시 시작 (백그라운드, 창 숨김)
-echo  [*] 데몬 시작 중...
+REM 7) Start daemon immediately (background, minimized)
+echo  [*] Starting daemon...
 start "InvestmentAnalysisDaemon" /MIN cmd /c "%DAEMON_BAT%"
 
-REM 8) 데몬이 떠는지 잠깐 확인
+REM 8) Confirm
 timeout /t 3 /nobreak >nul
 if exist "daemon.pid" (
   set /p NEW_PID=<daemon.pid
   echo.
   echo  ============================================================
-  echo   [OK] 데몬 설치 완료
+  echo   [OK] Daemon installed
   echo  ============================================================
   echo   PID         : !NEW_PID!
-  echo   자동 실행  : %LNK_PATH%
-  echo   로그        : %~dp0daemon.log
+  echo   Auto-start  : %LNK_PATH%
+  echo   Log         : %~dp0daemon.log
   echo.
-  echo   - PC 시작 시 자동으로 데몬이 켜집니다.
-  echo   - 사이트에서 [분석 시작] 누르면 자동으로 분석이 진행됩니다.
-  echo   - 제거하려면 uninstall-daemon.bat 을 실행하세요.
+  echo   - The daemon will auto-start every time you boot the PC.
+  echo   - Clicking [Start Analysis] on the website triggers analysis automatically.
+  echo   - To remove, run uninstall-daemon.bat
   echo  ============================================================
 ) else (
   echo.
-  echo  [!] 데몬 시작 확인 실패. daemon.log 를 확인하세요.
-  echo      또는 install-daemon.bat 을 다시 실행하세요.
+  echo  [!] Could not confirm daemon start. Check daemon.log
+  echo      or re-run install-daemon.bat
 )
 
 echo.
