@@ -30,13 +30,24 @@ create table if not exists public.reports (
   title text,
   company text, ticker text, period text,
   summary text,
-  status text not null default 'intake' check (status in ('intake','draft','published')),
+  status text not null default 'intake' check (status in ('intake','analyzing','draft','published')),
   md_path text, html_path text, pdf_path text,
   model_used text, web_search_used boolean default false,
   source_material text,
+  selected_sections jsonb default '["1","2","3","4","5","6","7","8","9"]'::jsonb,
   created_by uuid references public.profiles(id),
   created_at timestamptz default now()
 );
+
+-- 기존 테이블이 이미 있을 경우 (재실행) 컬럼/제약 보강
+do $$ begin
+  alter table public.reports drop constraint if exists reports_status_check;
+  alter table public.reports add constraint reports_status_check
+    check (status in ('intake','analyzing','draft','published'));
+exception when others then null; end $$;
+
+alter table public.reports add column if not exists
+  selected_sections jsonb default '["1","2","3","4","5","6","7","8","9"]'::jsonb;
 
 -- ===== board =====
 create table if not exists public.board_posts (

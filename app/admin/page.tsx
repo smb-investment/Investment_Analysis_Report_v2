@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { setMemberStatus, setReportStatus, adminDeletePost } from "@/lib/actions/admin";
+import StartAnalysisDialog from "./StartAnalysisDialog";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +15,14 @@ type ProfileRow = {
   status: "pending" | "approved" | "rejected";
   created_at: string;
 };
+type ReportStatus = "intake" | "analyzing" | "draft" | "published";
 type ReportRow = {
   id: string;
   title: string | null;
   company: string | null;
   period: string | null;
-  status: "intake" | "draft" | "published";
+  status: ReportStatus;
+  selected_sections: string[] | null;
   created_at: string;
 };
 type PostRow = {
@@ -35,14 +38,16 @@ const STATUS_LABEL: Record<ProfileRow["status"], string> = {
   rejected: "거부",
 };
 
-const REPORT_STATUS_LABEL: Record<ReportRow["status"], string> = {
+const REPORT_STATUS_LABEL: Record<ReportStatus, string> = {
   intake: "분석대기",
+  analyzing: "분석중",
   draft: "초안",
   published: "게시",
 };
 
-const REPORT_STATUS_TONE: Record<ReportRow["status"], string> = {
+const REPORT_STATUS_TONE: Record<ReportStatus, string> = {
   intake: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+  analyzing: "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300",
   draft: "bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300",
   published: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
 };
@@ -79,7 +84,7 @@ export default async function AdminPage({ searchParams }: { searchParams: { erro
   const supabase = createSupabaseServerClient();
   const [profilesRes, reportsRes, postsRes] = await Promise.all([
     supabase.from("profiles").select("id,email,role,status,created_at").order("created_at", { ascending: false }).limit(200),
-    supabase.from("reports").select("id,title,company,period,status,created_at").order("created_at", { ascending: false }).limit(100),
+    supabase.from("reports").select("id,title,company,period,status,selected_sections,created_at").order("created_at", { ascending: false }).limit(100),
     supabase
       .from("board_posts")
       .select("id,title,created_at,author:profiles!board_posts_author_id_fkey(email)")
@@ -225,34 +230,49 @@ export default async function AdminPage({ searchParams }: { searchParams: { erro
           <EmptyMini text="아직 보고서가 없습니다." />
         ) : (
           <ul className="divide-y divide-slate-200 dark:divide-slate-600">
-            {reports.map((r) => (
-              <li key={r.id} className="py-3 flex items-center justify-between gap-4 flex-wrap">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{r.title || r.company || "(제목 없음)"}</div>
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-medium ${REPORT_STATUS_TONE[r.status]}`}>
-                      {REPORT_STATUS_LABEL[r.status]}
-                    </span>
-                    {r.company && <span>{r.company}</span>}
-                    {r.period && <span>· {r.period}</span>}
-                    <span>· {formatDateTime(r.created_at)}</span>
+            {reports.map((r) => {
+              const label = r.title || r.company || "(제목 없음)";
+              const sections = Array.isArray(r.selected_sections) ? r.selected_sections : null;
+              return (
+                <li key={r.id} className="py-3 flex items-center justify-between gap-4 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{label}</div>
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-medium ${REPORT_STATUS_TONE[r.status]}`}>
+                        {REPORT_STATUS_LABEL[r.status]}
+                      </span>
+                      {r.company && <span>{r.company}</span>}
+                      {r.period && <span>· {r.period}</span>}
+                      <span>· {formatDateTime(r.created_at)}</span>
+                      {r.status === "analyzing" && sections && (
+                        <span className="text-violet-600 dark:text-violet-300">· §{sections.join(",")} 분석 중</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  {(["intake", "draft", "published"] as const)
-                    .filter((s) => s !== r.status)
-                    .map((s) => (
-                      <form action={setReportStatus} key={s}>
-                        <input type="hidden" name="id" value={r.id} />
-                        <input type="hidden" name="status" value={s} />
-                        <button className="px-2.5 py-1 rounded-md border border-slate-300 dark:border-slate-500 hover:border-cyan-500/60 hover:text-cyan-600 dark:hover:text-cyan-400 text-xs font-medium transition">
-                          → {REPORT_STATUS_LABEL[s]}
-                        </button>
-                      </form>
-                    ))}
-                </div>
-              </li>
-            ))}
+                  <div className="flex gap-1 shrink-0 items-center">
+                    {r.status === "intake" && (
+                      <StartAnalysisDialog
+                        reportId={r.id}
+                        reportLabel={label}
+                        defaultSections={sections ?? undefined}
+                      />
+                    )}
+                    {r.status === "analyzing" && (
+                      <ReportStatusButton id={r.id} status="intake" label="분석 취소" />
+                    )}
+                    {r.status === "draft" && (
+                      <>
+                        <ReportStatusButton id={r.id} status="published" label="게시" tone="primary" />
+                        <ReportStatusButton id={r.id} status="intake" label="분석대기로" />
+                      </>
+                    )}
+                    {r.status === "published" && (
+                      <ReportStatusButton id={r.id} status="draft" label="초안으로" />
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Panel>
@@ -321,5 +341,28 @@ function EmptyMini({ text }: { text: string }) {
     <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-600 px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
       {text}
     </div>
+  );
+}
+
+function ReportStatusButton({
+  id,
+  status,
+  label,
+  tone,
+}: {
+  id: string;
+  status: ReportStatus;
+  label: string;
+  tone?: "primary";
+}) {
+  const cls = tone === "primary"
+    ? "px-2.5 py-1 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold transition"
+    : "px-2.5 py-1 rounded-md border border-slate-300 dark:border-slate-500 hover:border-cyan-500/60 hover:text-cyan-600 dark:hover:text-cyan-400 text-xs font-medium transition";
+  return (
+    <form action={setReportStatus}>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="status" value={status} />
+      <button className={cls}>→ {label}</button>
+    </form>
   );
 }

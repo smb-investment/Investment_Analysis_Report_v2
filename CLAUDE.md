@@ -6,7 +6,7 @@
    회원제 투자 보고서 열람. **사이트 코드는 Claude API/Anthropic SDK 를 절대 호출하지 않습니다.**
    클라이언트는 `NEXT_PUBLIC_*` (anon key) 만 사용. service_role 키는 사이트/GitHub 에 존재하지 않습니다.
 2. **분석 엔진(`agent/`)** — 로컬 전용 도구. Claude Code 구독제(Pro/Max)로 작동.
-   사이트에 업로드된 `intake` PDF 를 분석해 9 섹션 보고서를 생성, `status=draft` 로 푸시.
+   사이트에서 PO 가 [분석 시작] 을 누른 `analyzing` 상태 보고서를 가져와 §0 + 선택된 §1~§9 를 작성해 `status=draft` 로 푸시.
 
 ---
 
@@ -66,22 +66,42 @@
 
 ## 운영 명령
 
+보고서 1건의 생애주기는 다음 4단계 상태로 진행한다:
+`intake` (자료수집) → `analyzing` (분석중) → `draft` (초안) → `published` (게시).
+
 ```powershell
 # 1) 사이트의 /admin/reports/new 에서 PDF 업로드 (status=intake)
-# 2) 자료 가져오기
+
+# 2) 사이트의 /admin 의 보고서 목록에서 [→ 분석 시작] 클릭
+#    → 9섹션 체크박스 모달에서 작성할 §1~§9 선택 (§0 Exec Summary 는 항상 포함)
+#    → status=analyzing, selected_sections 저장
+
+# 3) 로컬에서 분석 대기 보고서 가져오기 (analyzing 1건)
 node --env-file=agent/.env agent/pull.js
 
-# 3) Claude Code 에서 분석:
-#    "Supabase 의 분석대기(intake) 자료 가져와서 9섹션 투자검토보고서 만들어줘.
+# 4) Claude Code 에서 분석:
+#    "Supabase 의 분석중(analyzing) 자료 가져와서 meta.json 의 selected_sections 만 작성해줘.
 #     산업 시장규모·경쟁구도·최근 M&A 는 웹검색해서 채워줘."
-#    (Claude Code 가 agent/inbox/<reportId>/report.md 를 채움)
+#    (Claude Code 가 agent/inbox/<reportId>/report.md 를 채움 — 미선택 섹션 헤더는 이미 제거됨)
 
-# 4) 사람 검수 (사실/추정·출처·면책 확인)
+# 5) 사람 검수 (사실/추정·출처·면책 확인) — 로컬 report.md 직접 편집
 
-# 5) 사이트에 푸시
+# 6) 사이트에 푸시
 node --env-file=agent/.env agent/push.js <reportId> --web-search
 
-# 6) 사이트 /admin 에서 draft → published 토글
+# 7) 사이트 /admin 에서 draft → published 토글
+```
+
+### DB 마이그레이션 (1회성)
+
+`supabase/migrations/` 에 새 SQL 이 추가되면 한 번만 적용:
+
+```powershell
+# agent/.env 에 SUPABASE_DB_PASSWORD 가 필요
+# (Supabase Dashboard > Settings > Database > Database password)
+cd agent
+npm install                              # pg, supabase-js 의존성 (최초 1회만)
+node --env-file=.env migrate.js          # 미적용 SQL 모두 순서대로 실행
 ```
 
 ---
