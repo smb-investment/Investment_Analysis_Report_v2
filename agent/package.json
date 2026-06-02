@@ -7,6 +7,7 @@
     "pull": "node --env-file=.env pull.js",
     "push": "node --env-file=.env push.js",
     "analyze": "node --env-file=.env analyze.js",
+    "daemon": "node --env-file=.env daemon.js",
     "migrate": "node --env-file=.env migrate.js"
   },
   "dependencies": {

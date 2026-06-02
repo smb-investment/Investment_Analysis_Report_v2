@@ -36,10 +36,12 @@ next-env.d.ts
 # Claude Code
 .claude/
 
-# Analysis agent (local-only working dirs)
+# Analysis agent (local-only working dirs + runtime files)
 agent/inbox/
 agent/work/
 agent/archive/
+agent/daemon.log
+agent/daemon.pid
 
 # OS
 Thumbs.db

@@ -6,7 +6,7 @@
    회원제 투자 보고서 열람. **사이트 코드는 Claude API/Anthropic SDK 를 절대 호출하지 않습니다.**
    클라이언트는 `NEXT_PUBLIC_*` (anon key) 만 사용. service_role 키는 사이트/GitHub 에 존재하지 않습니다.
 2. **분석 엔진(`agent/`)** — 로컬 전용 도구. Claude Code 구독제(Pro/Max)로 작동.
-   사이트에서 PO 가 [분석 시작] 을 누른 `analyzing` 상태 보고서를 가져와 §0 + 선택된 §1~§9 를 작성해 `status=draft` 로 푸시.
+   `daemon.js` 가 PO PC 백그라운드에서 30초 간격 polling 으로 `analyzing` 상태 감지 → 자동으로 §0 + 선택된 §1~§9 작성 → `status=draft` 푸시. 사이트 [분석 시작] 만 누르면 자동 진행. PC 명령 0번 (셋업 1회 제외).
 
 ---
 
@@ -69,29 +69,55 @@
 보고서 1건의 생애주기는 다음 4단계 상태로 진행한다:
 `intake` (자료수집) → `analyzing` (분석중) → `draft` (초안) → `published` (게시).
 
-### 표준 흐름 (자동화 — Claude Code Max 구독제 활용, API 키 불필요)
+### 표준 흐름 (데몬 도입 — 사이트 클릭만으로 자동)
+
+데몬 1회 셋업 후로는 PC 명령 칠 일 없음.
+
+```
+1. 사이트 /admin/reports/new 에서 PDF 업로드 (status=intake)
+
+2. 사이트 /admin 에서 [→ 분석 시작] 클릭 + 섹션 선택
+   → status=analyzing
+
+3. (자동) PO PC 의 데몬이 30초 이내 감지
+   → pull.js → claude -p (Max 구독) → push.js → status=draft
+   → 30~60분 소요, 화면 변화 없이 백그라운드
+
+4. 사이트 /admin/reports/<id> 미리보기에서 검수 후 [→ 게시] 클릭
+   → status=published, 회원에게 노출
+```
+
+### 데몬 1회 셋업 (PO PC 에서 단 1번)
 
 ```powershell
-# 1) 사이트의 /admin/reports/new 에서 PDF 업로드 (status=intake)
-
-# 2) 사이트의 /admin 에서 보고서 행의 [→ 분석 시작] 클릭
-#    → 9섹션 체크박스 모달에서 작성할 §1~§9 선택 (§0 Exec Summary 는 항상 포함)
-#    → status=analyzing, selected_sections 저장
-
-# 3) PC 에서 한 줄 (30~60분 소요)
 cd agent
-npm run analyze
-#    내부: pull.js → claude -p (headless, --permission-mode acceptEdits)
-#          → push.js --web-search → status=draft
+npm install                       # 의존성 (최초 1회만)
+# Windows 탐색기에서 install-daemon.bat 더블클릭
+#   → 시작프로그램 등록 + 데몬 즉시 시작
+#   → 이후 PC 켤 때마다 자동 실행
+```
 
-# 4) 사이트 /admin/reports/<id> 미리보기에서 본문 검수 후 [→ 게시] 클릭
-#    → status=published, 회원에게 노출
+데몬 제거: `uninstall-daemon.bat` 더블클릭.
+
+### 데몬 상태 확인
+
+```powershell
+# 로그 실시간 보기
+Get-Content agent\daemon.log -Wait -Tail 20
+
+# 데몬 PID 확인
+Get-Content agent\daemon.pid
+
+# 수동 실행 (디버깅용 — 콘솔에서 직접 로그 보기)
+cd agent
+npm run daemon
 ```
 
 ### 보조 명령 (디버깅·부분 실행)
 
 ```powershell
 cd agent
+npm run analyze                   # 데몬 우회 1회 실행 (analyze.js 단독)
 node --env-file=.env pull.js [<reportId>]            # 다운로드만
 node --env-file=.env push.js <reportId> --web-search  # 업로드만
 ```

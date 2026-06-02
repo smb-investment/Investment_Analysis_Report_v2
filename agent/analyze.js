@@ -96,6 +96,7 @@ function loadPromptTemplate({ reportId, company, period, sections }) {
   const briefPrompt = `agent/inbox/${reportId}/_prompt.txt 의 지시대로 작업해줘. 작업 시작 전에 그 파일을 먼저 읽어. 모든 지시를 그대로 따른다.`;
   const r = spawnSync("claude", [
     "-p", briefPrompt,
+    "--model", "claude-sonnet-4-6",
     "--permission-mode", "acceptEdits",
     "--output-format", "text",
     "--add-dir", here, // agent 디렉토리 접근 허용
