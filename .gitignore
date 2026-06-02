@@ -43,3 +43,4 @@ agent/archive/
 
 # OS
 Thumbs.db
+.env*

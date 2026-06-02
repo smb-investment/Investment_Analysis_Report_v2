@@ -236,7 +236,12 @@ export default async function AdminPage({ searchParams }: { searchParams: { erro
               return (
                 <li key={r.id} className="py-3 flex items-center justify-between gap-4 flex-wrap">
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{label}</div>
+                    <Link
+                      href={`/admin/reports/${r.id}`}
+                      className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate hover:text-cyan-600 dark:hover:text-cyan-400 transition"
+                    >
+                      {label}
+                    </Link>
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded font-medium ${REPORT_STATUS_TONE[r.status]}`}>
                         {REPORT_STATUS_LABEL[r.status]}
@@ -250,6 +255,14 @@ export default async function AdminPage({ searchParams }: { searchParams: { erro
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0 items-center">
+                    {(r.status === "draft" || r.status === "published") && (
+                      <Link
+                        href={`/admin/reports/${r.id}`}
+                        className="px-2.5 py-1 rounded-md border border-cyan-400/50 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 text-xs font-medium transition"
+                      >
+                        미리보기
+                      </Link>
+                    )}
                     {r.status === "intake" && (
                       <StartAnalysisDialog
                         reportId={r.id}

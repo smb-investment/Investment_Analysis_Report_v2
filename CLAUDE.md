@@ -69,27 +69,31 @@
 보고서 1건의 생애주기는 다음 4단계 상태로 진행한다:
 `intake` (자료수집) → `analyzing` (분석중) → `draft` (초안) → `published` (게시).
 
+### 표준 흐름 (자동화 — Claude Code Max 구독제 활용, API 키 불필요)
+
 ```powershell
 # 1) 사이트의 /admin/reports/new 에서 PDF 업로드 (status=intake)
 
-# 2) 사이트의 /admin 의 보고서 목록에서 [→ 분석 시작] 클릭
+# 2) 사이트의 /admin 에서 보고서 행의 [→ 분석 시작] 클릭
 #    → 9섹션 체크박스 모달에서 작성할 §1~§9 선택 (§0 Exec Summary 는 항상 포함)
 #    → status=analyzing, selected_sections 저장
 
-# 3) 로컬에서 분석 대기 보고서 가져오기 (analyzing 1건)
-node --env-file=agent/.env agent/pull.js
+# 3) PC 에서 한 줄 (30~60분 소요)
+cd agent
+npm run analyze
+#    내부: pull.js → claude -p (headless, --permission-mode acceptEdits)
+#          → push.js --web-search → status=draft
 
-# 4) Claude Code 에서 분석:
-#    "Supabase 의 분석중(analyzing) 자료 가져와서 meta.json 의 selected_sections 만 작성해줘.
-#     산업 시장규모·경쟁구도·최근 M&A 는 웹검색해서 채워줘."
-#    (Claude Code 가 agent/inbox/<reportId>/report.md 를 채움 — 미선택 섹션 헤더는 이미 제거됨)
+# 4) 사이트 /admin/reports/<id> 미리보기에서 본문 검수 후 [→ 게시] 클릭
+#    → status=published, 회원에게 노출
+```
 
-# 5) 사람 검수 (사실/추정·출처·면책 확인) — 로컬 report.md 직접 편집
+### 보조 명령 (디버깅·부분 실행)
 
-# 6) 사이트에 푸시
-node --env-file=agent/.env agent/push.js <reportId> --web-search
-
-# 7) 사이트 /admin 에서 draft → published 토글
+```powershell
+cd agent
+node --env-file=.env pull.js [<reportId>]            # 다운로드만
+node --env-file=.env push.js <reportId> --web-search  # 업로드만
 ```
 
 ### DB 마이그레이션 (1회성)
