@@ -40,22 +40,23 @@ mkdirSync(join(workDir, "attachments"), { recursive: true });
 
 function log(msg) { console.log(`[${new Date().toISOString()}] ${msg}`); }
 
-// TEST 케이스에서 실제로 작동했던 방식 그대로 유지
-// cwd:ROOT + acceptEdits + stdio:inherit + 파일참조 brief
+// stdin 파이프 방식: 프롬프트 내용을 claude stdin으로 직접 전달
+// → "파일 읽고 실행해" 방식 없이 지시사항이 바로 Claude에게 전달됨
+// → "실행할까요?" 확인 요청 원천 차단
 function runClaude(promptFile, label, _unused, timeoutMs = 25 * 60 * 1000) {
-  const promptRelPath = promptFile
-    .replace(ROOT + "/", "").replace(ROOT + "\\", "")
-    .replace(/\\/g, "/");
-  const brief = `${promptRelPath} 파일을 Read tool로 읽고 모든 Step을 즉시 실행하세요. Write tool로 지정 파일을 생성하세요.`;
-  log(`▶ Claude [${label}] 시작...`);
+  const promptContent = readFileSync(promptFile, "utf8");
+  log(`▶ Claude [${label}] 시작... (${promptContent.length} chars)`);
+
+  // PowerShell로 stdin 파이프: 특수문자 cmd.exe 파싱 이슈 완전 우회
+  const psScript = [
+    `$content = Get-Content -Raw '${promptFile.replace(/'/g, "''")}'`,
+    `$content | & claude --permission-mode acceptEdits --add-dir '${workDir.replace(/'/g, "''")}' --add-dir '${__dirname.replace(/'/g, "''")}'`,
+  ].join("; ");
+
   const r = spawnSync(
-    "claude",
-    ["-p", brief,
-     "--permission-mode", "acceptEdits",
-     "--append-system-prompt", "Automated pipeline agent. Execute all tasks immediately. Use Write tool to create files. No confirmation needed.",
-     "--add-dir", workDir,
-     "--add-dir", __dirname],
-    { cwd: ROOT, stdio: "inherit", shell: process.platform === "win32", timeout: timeoutMs }
+    "powershell",
+    ["-NoProfile", "-NonInteractive", "-Command", psScript],
+    { cwd: ROOT, stdio: "inherit", shell: false, timeout: timeoutMs }
   );
   if (r.error)        { log(`❌ [${label}] spawn error: ${r.error.message}`); return false; }
   if (r.status !== 0) { log(`❌ [${label}] exit=${r.status}`); return false; }
