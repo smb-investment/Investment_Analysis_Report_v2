@@ -297,7 +297,6 @@ Output ONLY a JSON object: {"overall_score":N,"overall_pass":bool,"slides":{"cov
 
   // P5: Build
   const pptxPath = join(workDir, "proposal.pptx");
-  const mdPath   = join(workDir, mdFileName);
   const htmlPath = join(workDir, "proposal.html");
 
   const buildResult = spawnSync(
