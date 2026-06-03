@@ -46,12 +46,8 @@ function runClaude(promptFile, label, timeoutMs = 20 * 60 * 1000) {
     .replace(ROOT + "/", "")
     .replace(ROOT + "\\", "")
     .replace(/\\/g, "/");
-  // 명확한 실행 지시 — 설명 응답 방지
-  const brief = [
-    `[EXECUTE NOW] Read file: ${promptRelPath}`,
-    `Then immediately execute ALL steps in that file using your tools.`,
-    `Use Write tool to create ALL output files specified. Do NOT describe or summarize — just execute.`,
-  ].join(" ");
+  // 한국어 유지 (cmd.exe 괄호 파싱 버그 회피) + 파일 생성 명시
+  const brief = `${promptRelPath} 파일을 Read tool로 읽고 모든 Step을 즉시 실행하세요. Write tool로 지정 파일을 생성하세요. 설명 응답 금지.`;
   log(`▶ Claude [${label}] 시작...`);
   const r = spawnSync(
     "claude",
