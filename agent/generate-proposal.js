@@ -52,7 +52,7 @@ function runClaude(promptFile, label, timeoutMs = 20 * 60 * 1000) {
   const r = spawnSync(
     "claude",
     ["-p", brief,
-     "-s", systemPrompt,
+     "--system-prompt", systemPrompt,
      "--permission-mode", "acceptEdits",
      "--add-dir", workDir,
      "--add-dir", __dirname],
