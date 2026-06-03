@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /**
- * generate-proposal.js
- * 투자요청서 PPTX 생성 오케스트레이터
- * Usage: node --env-file=agent/.env.proposal agent/generate-proposal.js <proposalId>
+ * generate-proposal.js  — 5-Phase Quality-Controlled Pipeline
  *
- * Flow:
- *   1. Supabase에서 proposal 메타데이터 + 첨부파일 다운로드
- *   2. claude -p 로 슬라이드 JSON 구조화
- *   3. build-pptx.js → PPTX 생성
- *   4. PPTX → Supabase Storage 업로드
- *   5. status = 'ready'
+ * Phase 1 (analyzing):  PDF 완전 추출 → extraction.json
+ * Phase 2 (analyzing):  슬라이드 기획안 → plan.md  → status=planning
+ * Phase 3 (generating): 기획안 기반 작성 → MD + slides.json
+ * Phase 4 (generating): QA 채점 → qa_report.json  (실패 시 재작성 최대 2회)
+ * Phase 5 (generating): PPTX + HTML 빌드 → Storage 업로드 → status=ready
+ *
+ * Usage:
+ *   node --env-file=agent/.env.proposal agent/generate-proposal.js <proposalId> <phase>
+ *   phase: "analyze" | "generate"
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -19,159 +20,290 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, "..");
-const INBOX = join(__dirname, "proposal-inbox");
+const ROOT      = join(__dirname, "..");
+const INBOX     = join(__dirname, "proposal-inbox");
+const PROMPTS   = join(__dirname, "prompts");
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL  = process.env.SUPABASE_URL;
+const SERVICE_KEY   = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!SUPABASE_URL || !SERVICE_KEY) { console.error("env not set"); process.exit(1); }
 
-const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-
-const proposalId = process.argv[2];
-if (!proposalId) { console.error("Usage: generate-proposal.js <proposalId>"); process.exit(1); }
+const supabase     = createClient(SUPABASE_URL, SERVICE_KEY);
+const proposalId   = process.argv[2];
+const phaseArg     = process.argv[3] ?? "analyze"; // "analyze" | "generate"
+if (!proposalId) { console.error("Usage: generate-proposal.js <proposalId> <phase>"); process.exit(1); }
 
 const workDir = join(INBOX, proposalId);
 mkdirSync(join(workDir, "attachments"), { recursive: true });
 
-// 1. 메타데이터 로드
-const { data: proposal, error } = await supabase
-  .from("proposals")
-  .select("*")
-  .eq("id", proposalId)
-  .single();
+// ── helpers ──────────────────────────────────────────────────────────────
 
-if (error || !proposal) { console.error("proposal not found:", error?.message); process.exit(1); }
+function log(msg) { console.log(`[${new Date().toISOString()}] ${msg}`); }
 
-// meta.json 저장
-writeFileSync(join(workDir, "meta.json"), JSON.stringify(proposal, null, 2));
-console.log(`✅ Loaded proposal: ${proposal.company_name}`);
-
-// 2. 첨부파일 다운로드
-const attachments = Array.isArray(proposal.source_attachments) ? proposal.source_attachments : [];
-for (const path of attachments) {
-  const { data: fileData, error: dlErr } = await supabase.storage
-    .from("proposals-attachments")
-    .download(path);
-  if (dlErr) { console.warn(`⚠️ skip ${path}: ${dlErr.message}`); continue; }
-  const buf = Buffer.from(await fileData.arrayBuffer());
-  const fileName = path.split("/").pop();
-  writeFileSync(join(workDir, "attachments", fileName), buf);
-  console.log(`  ↓ ${fileName}`);
+function runClaude(promptFile, label, timeoutMs = 20 * 60 * 1000) {
+  const promptRelPath = promptFile.replace(ROOT + "/", "").replace(ROOT + "\\", "");
+  const brief = `${promptRelPath} 파일을 먼저 읽고, 그 안의 지시사항을 모두 따라 작업해줘.`;
+  log(`▶ Claude [${label}] 시작...`);
+  const r = spawnSync(
+    "claude",
+    ["-p", brief,
+     "--permission-mode", "acceptEdits",
+     "--add-dir", workDir,
+     "--add-dir", __dirname],
+    { cwd: ROOT, stdio: "inherit", shell: process.platform === "win32", timeout: timeoutMs }
+  );
+  if (r.error)       { log(`❌ [${label}] spawn error: ${r.error.message}`); return false; }
+  if (r.status !== 0){ log(`❌ [${label}] exit=${r.status}`); return false; }
+  log(`✅ [${label}] 완료`);
+  return true;
 }
 
-// 3. claude -p: 파일 분석 → MD + slides.json 생성
-const promptTemplate = readFileSync(join(__dirname, "prompts", "proposal.md"), "utf8");
-const prompt = promptTemplate
-  .replace(/{{proposalId}}/g, proposalId)
-  .replace(/{{company}}/g, proposal.company_name)
-  .replace(/{{projectName}}/g, proposal.project_name || proposal.company_name)
-  .replace(/{{workDir}}/g, workDir);
-
-const promptFile = join(workDir, "_prompt.txt");
-writeFileSync(promptFile, prompt);
-
-console.log("▶ Running claude -p (파일 분석 → MD + slides.json) ...");
-const claudeResult = spawnSync(
-  "claude",
-  ["-p", readFileSync(promptFile, "utf8"),
-   "--permission-mode", "acceptEdits",
-   "--add-dir", workDir,
-   "--add-dir", __dirname],
-  { cwd: ROOT, stdio: "inherit", timeout: 25 * 60 * 1000 }
-);
-
-if (claudeResult.status !== 0) {
-  console.error(`❌ claude failed (exit=${claudeResult.status})`);
-  process.exit(1);
+function fillPrompt(templateFile, vars) {
+  let tpl = readFileSync(templateFile, "utf8");
+  for (const [k, v] of Object.entries(vars)) tpl = tpl.replaceAll(`{{${k}}}`, v);
+  return tpl;
 }
 
-// 4. MD 파일 확인
-const mdFileName = `${proposal.company_name}_Investment_Proposal.md`;
-const mdPath = join(workDir, mdFileName);
-const mdExists = existsSync(mdPath);
-if (!mdExists) {
-  console.warn("⚠️ MD file not found, continuing without MD upload");
+async function setStatus(status, extra = {}) {
+  await supabase.from("proposals").update({ status, ...extra }).eq("id", proposalId);
+  log(`→ status: ${status}`);
+}
+
+async function loadProposal() {
+  const { data, error } = await supabase.from("proposals").select("*").eq("id", proposalId).single();
+  if (error || !data) { log("❌ proposal not found"); process.exit(1); }
+  return data;
+}
+
+async function downloadAttachments(proposal) {
+  const attachments = Array.isArray(proposal.source_attachments) ? proposal.source_attachments : [];
+  for (const path of attachments) {
+    const { data: fileData, error: dlErr } = await supabase.storage
+      .from("proposals-attachments").download(path);
+    if (dlErr) { log(`⚠️ skip ${path}: ${dlErr.message}`); continue; }
+    const buf = Buffer.from(await fileData.arrayBuffer());
+    const fileName = path.split("/").pop();
+    writeFileSync(join(workDir, "attachments", fileName), buf);
+    log(`  ↓ ${fileName}`);
+  }
+}
+
+// ── QA 파싱 & 재작성 ───────────────────────────────────────────────────
+
+function parseQaReport() {
+  const p = join(workDir, "qa_report.json");
+  if (!existsSync(p)) return null;
+  try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; }
+}
+
+function buildFixPrompt(qaReport, proposal) {
+  const failed = qaReport.failed_slides ?? [];
+  if (!failed.length) return null;
+
+  const fixes = failed.map(key => {
+    const s = qaReport.slides[key];
+    return `### ${key} (점수: ${s.score}/100)\n문제: ${s.issues.join(", ")}\n수정 지시: ${s.fix_instructions}`;
+  }).join("\n\n");
+
+  const content = `# 투자요청서 재작성 지시
+
+당신은 투자요청서 QA 수정 전문가입니다.
+아래 불합격 슬라이드만 targeted 수정합니다.
+
+## 절대 규칙
+- extraction.json에 없는 수치 생성 금지
+- 합격 슬라이드는 절대 변경하지 않음
+- slides.json의 chart_data.value는 반드시 number
+
+## 작업 디렉토리
+${workDir}
+
+## 수정 대상 슬라이드
+${fixes}
+
+## 수정 후
+slides.json과 MD 파일을 수정된 내용으로 업데이트하세요.
+완료 후: "✅ 재작성 완료 — 수정된 슬라이드: ${failed.join(", ")}"
+`;
+  const fixFile = join(workDir, "_fix_prompt.txt");
+  writeFileSync(fixFile, content, "utf8");
+  return fixFile;
+}
+
+// ── Phase A: ANALYZE (input → analyzing → planning) ───────────────────
+
+async function runAnalyze() {
+  const proposal = await loadProposal();
+  writeFileSync(join(workDir, "meta.json"), JSON.stringify(proposal, null, 2));
+  log(`✅ Loaded: ${proposal.company_name}`);
+
+  await downloadAttachments(proposal);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const vars = { company: proposal.company_name, workDir, today, proposalId };
+
+  // P1: Extract
+  const extractPrompt = join(workDir, "_extract_prompt.txt");
+  writeFileSync(extractPrompt, fillPrompt(join(PROMPTS, "extract.md"), vars), "utf8");
+  const extractOk = runClaude(extractPrompt, "P1:Extract", 20 * 60 * 1000);
+  if (!extractOk || !existsSync(join(workDir, "extraction.json"))) {
+    await setStatus("input", { error_message: "P1 Extract 실패: extraction.json 미생성" });
+    process.exit(1);
+  }
+
+  // P2: Plan
+  const planPrompt = join(workDir, "_plan_prompt.txt");
+  writeFileSync(planPrompt, fillPrompt(join(PROMPTS, "plan.md"), vars), "utf8");
+  const planOk = runClaude(planPrompt, "P2:Plan", 15 * 60 * 1000);
+  if (!planOk || !existsSync(join(workDir, "plan.md"))) {
+    await setStatus("input", { error_message: "P2 Plan 실패: plan.md 미생성" });
+    process.exit(1);
+  }
+
+  // plan.md 내용을 DB에 저장 → 사이트에서 표시
+  const planMd = readFileSync(join(workDir, "plan.md"), "utf8");
+  const extractionJson = readFileSync(join(workDir, "extraction.json"), "utf8");
+  await setStatus("planning", {
+    plan_md: planMd,
+    extraction_json: extractionJson,
+    error_message: null,
+  });
+  log("✅ 기획안 완료 → 사이트에서 검토 후 승인하세요");
+}
+
+// ── Phase B: GENERATE (planning → generating → ready) ─────────────────
+
+async function runGenerate() {
+  const proposal = await loadProposal();
+  writeFileSync(join(workDir, "meta.json"), JSON.stringify(proposal, null, 2));
+
+  // plan.md, extraction.json 복원 (DB → 파일)
+  if (proposal.plan_md)        writeFileSync(join(workDir, "plan.md"), proposal.plan_md, "utf8");
+  if (proposal.extraction_json) writeFileSync(join(workDir, "extraction.json"), proposal.extraction_json, "utf8");
+
+  await downloadAttachments(proposal);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const vars = { company: proposal.company_name, workDir, today, proposalId };
+  const mdFileName = `${proposal.company_name}_Investment_Proposal.md`;
+
+  // P3: Write
+  const writePrompt = join(workDir, "_write_prompt.txt");
+  writeFileSync(writePrompt, fillPrompt(join(PROMPTS, "write.md"), vars), "utf8");
+  const writeOk = runClaude(writePrompt, "P3:Write", 25 * 60 * 1000);
+  if (!writeOk || !existsSync(join(workDir, "slides.json"))) {
+    await setStatus("planning", { error_message: "P3 Write 실패: slides.json 미생성" });
+    process.exit(1);
+  }
+
+  // P4: QA + 재작성 (최대 2회)
+  let qaPass = false;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const qaPrompt = join(workDir, `_qa_prompt_${attempt}.txt`);
+    writeFileSync(qaPrompt, fillPrompt(join(PROMPTS, "qa.md"), vars), "utf8");
+    const qaOk = runClaude(qaPrompt, `P4:QA(${attempt})`, 10 * 60 * 1000);
+
+    const qaReport = parseQaReport();
+    if (!qaReport) {
+      log(`⚠️ QA ${attempt}회차: qa_report.json 파싱 실패 — 계속 진행`);
+      break;
+    }
+
+    log(`QA 점수: ${qaReport.overall_score}점 / ${qaReport.overall_pass ? "PASS" : "FAIL"} / 불합격 ${(qaReport.failed_slides ?? []).length}개`);
+
+    if (qaReport.overall_pass) { qaPass = true; break; }
+
+    if (attempt < 3) {
+      const fixFile = buildFixPrompt(qaReport, proposal);
+      if (!fixFile) { log("재작성 대상 없음 — QA 통과 처리"); qaPass = true; break; }
+      const fixOk = runClaude(fixFile, `P4:Fix(${attempt})`, 15 * 60 * 1000);
+      if (!fixOk) { log(`⚠️ Fix ${attempt}회차 실패 — 다음 QA 시도`); }
+    } else {
+      log(`⚠️ QA 3회 후 미통과 — human_review 플래그로 계속 진행`);
+    }
+  }
+
+  const finalQa = parseQaReport();
+
+  // P5: Build
+  const pptxPath = join(workDir, "proposal.pptx");
+  const mdPath   = join(workDir, mdFileName);
+  const htmlPath = join(workDir, "proposal.html");
+
+  const buildResult = spawnSync(
+    "node",
+    [join(__dirname, "build-pptx.js"), join(workDir, "slides.json"), pptxPath],
+    { cwd: ROOT, stdio: "inherit", timeout: 5 * 60 * 1000 }
+  );
+  if (buildResult.status !== 0) {
+    await setStatus("planning", { error_message: "P5 PPTX 빌드 실패" });
+    process.exit(1);
+  }
+  log("✅ PPTX built");
+
+  if (existsSync(mdPath)) {
+    const mdContent = readFileSync(mdPath, "utf8");
+    writeFileSync(htmlPath, buildHtml(mdContent, proposal.company_name), "utf8");
+    log("✅ HTML generated");
+  }
+
+  // Upload
+  const pptxStoragePath = `${proposalId}/proposal.pptx`;
+  const { error: upPptxErr } = await supabase.storage
+    .from("proposals-pptx").upload(pptxStoragePath, readFileSync(pptxPath), {
+      contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      upsert: true,
+    });
+  if (upPptxErr) { log(`❌ PPTX upload failed: ${upPptxErr.message}`); process.exit(1); }
+  log("✅ PPTX uploaded");
+
+  let mdStoragePath = null;
+  if (existsSync(mdPath)) {
+    mdStoragePath = `${proposalId}/${mdFileName}`;
+    const { error: upMdErr } = await supabase.storage
+      .from("proposals-md").upload(mdStoragePath, readFileSync(mdPath), {
+        contentType: "text/markdown; charset=utf-8", upsert: true,
+      });
+    if (upMdErr) log(`⚠️ MD upload failed: ${upMdErr.message}`);
+    else log("✅ MD uploaded");
+  }
+
+  let htmlStoragePath = null;
+  if (existsSync(htmlPath)) {
+    htmlStoragePath = `${proposalId}/proposal.html`;
+    const { error: upHtmlErr } = await supabase.storage
+      .from("proposals-html").upload(htmlStoragePath, readFileSync(htmlPath), {
+        contentType: "text/html; charset=utf-8", upsert: true,
+      });
+    if (upHtmlErr) log(`⚠️ HTML upload failed: ${upHtmlErr.message}`);
+    else log("✅ HTML uploaded");
+  }
+
+  await setStatus("ready", {
+    pptx_path: pptxStoragePath,
+    md_path: mdStoragePath,
+    html_path: htmlStoragePath,
+    qa_report: finalQa,
+    qa_passed: finalQa?.overall_pass ?? null,
+    model_used: "claude-code",
+    error_message: null,
+  });
+
+  log(`✅ Done — proposal ${proposalId} status=ready / QA: ${finalQa?.overall_score ?? "?"}점`);
+}
+
+// ── Entry ────────────────────────────────────────────────────────────────
+
+if (phaseArg === "analyze") {
+  await runAnalyze();
+} else if (phaseArg === "generate") {
+  await runGenerate();
 } else {
-  console.log("✅ MD generated:", mdFileName);
-}
-
-// 5. slides.json 확인
-const slidesPath = join(workDir, "slides.json");
-if (!existsSync(slidesPath)) {
-  console.error("❌ slides.json not generated by claude");
+  console.error(`Unknown phase: ${phaseArg}. Use "analyze" or "generate"`);
   process.exit(1);
 }
-console.log("✅ slides.json generated");
 
-// 6. PPTX 빌드
-const pptxPath = join(workDir, "proposal.pptx");
-const buildResult = spawnSync(
-  "node",
-  [join(__dirname, "build-pptx.js"), slidesPath, pptxPath],
-  { cwd: ROOT, stdio: "inherit", timeout: 5 * 60 * 1000 }
-);
-
-if (buildResult.status !== 0) {
-  console.error("❌ build-pptx failed");
-  process.exit(1);
-}
-console.log("✅ PPTX built");
-
-// 7. HTML 생성 (MD → A4 landscape HTML)
-const htmlPath = join(workDir, "proposal.html");
-if (mdExists) {
-  const mdContent = readFileSync(mdPath, "utf8");
-  const htmlContent = buildHtml(mdContent, proposal.company_name);
-  writeFileSync(htmlPath, htmlContent, "utf8");
-  console.log("✅ HTML generated");
-}
-
-// 8. Supabase Storage 업로드
-const pptxBuf = readFileSync(pptxPath);
-const pptxStoragePath = `${proposalId}/proposal.pptx`;
-const { error: upPptxErr } = await supabase.storage.from("proposals-pptx").upload(pptxStoragePath, pptxBuf, {
-  contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  upsert: true,
-});
-if (upPptxErr) { console.error("❌ PPTX upload failed:", upPptxErr.message); process.exit(1); }
-console.log("✅ PPTX uploaded");
-
-let mdStoragePath = null;
-if (mdExists) {
-  const mdBuf = readFileSync(mdPath);
-  mdStoragePath = `${proposalId}/${mdFileName}`;
-  const { error: upMdErr } = await supabase.storage.from("proposals-md").upload(mdStoragePath, mdBuf, {
-    contentType: "text/markdown; charset=utf-8", upsert: true,
-  });
-  if (upMdErr) console.warn("⚠️ MD upload failed:", upMdErr.message);
-  else console.log("✅ MD uploaded");
-}
-
-let htmlStoragePath = null;
-if (existsSync(htmlPath)) {
-  const htmlBuf = readFileSync(htmlPath);
-  htmlStoragePath = `${proposalId}/proposal.html`;
-  const { error: upHtmlErr } = await supabase.storage.from("proposals-html").upload(htmlStoragePath, htmlBuf, {
-    contentType: "text/html; charset=utf-8", upsert: true,
-  });
-  if (upHtmlErr) console.warn("⚠️ HTML upload failed:", upHtmlErr.message);
-  else console.log("✅ HTML uploaded");
-}
-
-// 9. DB 업데이트
-await supabase.from("proposals").update({
-  status: "ready",
-  pptx_path: pptxStoragePath,
-  md_path: mdStoragePath,
-  html_path: htmlStoragePath,
-  model_used: "claude-code",
-  error_message: null,
-}).eq("id", proposalId);
-
-console.log(`✅ Done — proposal ${proposalId} status=ready`);
-
-// ─── HTML 빌더 ─────────────────────────────────────────────────────────
+// ── HTML Builder ─────────────────────────────────────────────────────────
 function buildHtml(md, companyName) {
   const body = md
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")

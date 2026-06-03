@@ -1,23 +1,24 @@
 @echo off
 REM install-proposal-daemon.bat
 REM Registers proposal-daemon.js as a Windows startup item
-REM Run once as administrator (or just double-click)
+REM Run once (double-click)
 
 set SCRIPT_DIR=%~dp0
-set NODE_PATH=node
-set ENV_FILE=%SCRIPT_DIR%.env.proposal
-set DAEMON=%SCRIPT_DIR%proposal-daemon.js
+set RUNNER=%SCRIPT_DIR%run-proposal-daemon.bat
 set STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
-
-REM Create VBScript launcher to run daemon without console window
 set VBS=%STARTUP%\proposal-daemon.vbs
+
+REM Write PID file path for reference
+echo %SCRIPT_DIR%proposal-daemon.pid
+
+REM Create VBScript launcher in Startup folder (runs silently, no console window)
 (
-  echo Set objShell = CreateObject("WScript.Shell"^)
-  echo objShell.Run "cmd /c cd /d ""%SCRIPT_DIR%.."" ^&^& node --env-file=""%ENV_FILE%"" ""%DAEMON%"" >> ""%SCRIPT_DIR%proposal-daemon.log"" 2^>^&1", 0, False
+  echo Set objShell = CreateObject^("WScript.Shell"^)
+  echo objShell.Run "%RUNNER%", 0, False
 ) > "%VBS%"
 
 echo Registered: %VBS%
 echo Starting daemon now...
-start "" /B cmd /c "cd /d %SCRIPT_DIR%.. && node --env-file="%ENV_FILE%" "%DAEMON%" >> "%SCRIPT_DIR%proposal-daemon.log" 2>&1"
+start "" "%RUNNER%"
 echo Done. proposal-daemon will auto-start on next login.
 pause

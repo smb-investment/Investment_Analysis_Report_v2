@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireAdmin, getSessionContext } from "@/lib/auth";
 
-export type ProposalStatus = "input" | "generating" | "ready" | "delivered";
+export type ProposalStatus = "input" | "analyzing" | "planning" | "generating" | "ready" | "delivered";
 
 export type Proposal = {
   id: string;
@@ -25,6 +25,11 @@ export type Proposal = {
   md_path: string | null;
   html_path: string | null;
   source_attachments: string[];
+  extraction_json: string | null;
+  plan_md: string | null;
+  plan_approved_at: string | null;
+  qa_report: Record<string, unknown> | null;
+  qa_passed: boolean | null;
   model_used: string | null;
   error_message: string | null;
   created_by: string | null;
@@ -52,6 +57,7 @@ export async function createProposal(formData: FormData): Promise<void> {
       interest_rate: String(formData.get("interest_rate") ?? "").trim() || null,
       tenor_months: Number(formData.get("tenor_months")) || null,
       notes: String(formData.get("notes") ?? "").trim() || null,
+      status: "input" as ProposalStatus,
       created_by: ctx.user!.id,
     })
     .select("id")
@@ -84,15 +90,43 @@ export async function createProposal(formData: FormData): Promise<void> {
   redirect(`/admin/proposals/${proposalId}`);
 }
 
-export async function startGeneration(proposalId: string): Promise<void> {
+export async function startAnalysis(proposalId: string): Promise<void> {
   const ctx = await requireAdmin();
   if (ctx.error) redirect("/login");
   const supabase = createSupabaseServerClient();
   const { error } = await supabase
     .from("proposals")
-    .update({ status: "generating", error_message: null })
+    .update({ status: "analyzing", error_message: null })
     .eq("id", proposalId)
     .eq("status", "input");
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/proposals/${proposalId}`);
+  revalidatePath("/admin/proposals");
+}
+
+export async function approvePlan(proposalId: string): Promise<void> {
+  const ctx = await requireAdmin();
+  if (ctx.error) redirect("/login");
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase
+    .from("proposals")
+    .update({ status: "generating", plan_approved_at: new Date().toISOString(), error_message: null })
+    .eq("id", proposalId)
+    .eq("status", "planning");
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/proposals/${proposalId}`);
+  revalidatePath("/admin/proposals");
+}
+
+export async function rejectPlan(proposalId: string): Promise<void> {
+  const ctx = await requireAdmin();
+  if (ctx.error) redirect("/login");
+  const supabase = createSupabaseServerClient();
+  const { error } = await supabase
+    .from("proposals")
+    .update({ status: "input", plan_md: null, extraction_json: null, error_message: null })
+    .eq("id", proposalId)
+    .eq("status", "planning");
   if (error) throw new Error(error.message);
   revalidatePath(`/admin/proposals/${proposalId}`);
   revalidatePath("/admin/proposals");
