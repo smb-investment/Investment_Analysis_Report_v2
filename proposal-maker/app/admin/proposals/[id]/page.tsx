@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { startGeneration, setProposalStatus, deleteProposal, getProposalDownloadUrl, getSignedUrl } from "@/lib/actions/proposals";
+import { startGeneration, setProposalStatus, deleteProposal } from "@/lib/actions/proposals";
 import type { Proposal } from "@/lib/actions/proposals";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -25,14 +25,10 @@ export default async function ProposalDetailPage({ params }: { params: { id: str
   if (!data) notFound();
   const proposal = data as Proposal;
   const st = STATUS[proposal.status] ?? { label: proposal.status, cls: "bg-gray-100 text-gray-700" };
-  let downloadUrl: string | null = null;
-  let mdUrl: string | null = null;
-  let htmlUrl: string | null = null;
-  if (proposal.status === "ready" || proposal.status === "delivered") {
-    if (proposal.pptx_path) downloadUrl = await getProposalDownloadUrl(proposal.pptx_path);
-    if (proposal.md_path) mdUrl = await getSignedUrl("proposals-md", proposal.md_path);
-    if (proposal.html_path) htmlUrl = `/api/proposals/${proposal.id}/html`;
-  }
+  const isReady = proposal.status === "ready" || proposal.status === "delivered";
+  const pptxUrl = isReady && proposal.pptx_path ? `/api/proposals/${proposal.id}/pptx` : null;
+  const mdUrl   = isReady && proposal.md_path   ? `/api/proposals/${proposal.id}/md`   : null;
+  const htmlUrl = isReady && proposal.html_path  ? `/api/proposals/${proposal.id}/html` : null;
   return (
     <section className="max-w-2xl">
       <div className="mb-6">
@@ -48,12 +44,12 @@ export default async function ProposalDetailPage({ params }: { params: { id: str
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">❌ {proposal.error_message}</div>
       )}
 
-      {(proposal.status === "ready" || proposal.status === "delivered") && (downloadUrl || mdUrl || htmlUrl) && (
+      {(pptxUrl || mdUrl || htmlUrl) && (
         <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200">
           <p className="text-sm font-medium text-green-800 mb-3">✅ 생성 완료</p>
           <div className="flex flex-wrap gap-2">
-            {downloadUrl && (
-              <a href={downloadUrl} download className="inline-flex items-center gap-2 px-4 py-2 bg-[#7BAD8C] text-white rounded-lg hover:bg-[#6a9a7b] transition text-sm font-medium">
+            {pptxUrl && (
+              <a href={pptxUrl} download className="inline-flex items-center gap-2 px-4 py-2 bg-[#7BAD8C] text-white rounded-lg hover:bg-[#6a9a7b] transition text-sm font-medium">
                 📥 PPTX 다운로드
               </a>
             )}
