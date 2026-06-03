@@ -45,7 +45,7 @@ function runClaude(task, label, timeoutMs = 20 * 60 * 1000) {
   const r = spawnSync(
     "claude",
     ["-p", task,
-     "--permission-mode", "acceptEdits",
+     "--dangerously-skip-permissions",
      "--add-dir", workDir,
      "--add-dir", __dirname],
     { cwd: workDir, stdio: "inherit", shell: process.platform === "win32", timeout: timeoutMs }
