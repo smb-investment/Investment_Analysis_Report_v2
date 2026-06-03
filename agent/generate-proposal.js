@@ -223,6 +223,7 @@ async function runGenerate() {
 
   // P5: Build
   const pptxPath = join(workDir, "proposal.pptx");
+  const mdPath   = join(workDir, mdFileName);
   const htmlPath = join(workDir, "proposal.html");
 
   const buildResult = spawnSync(
