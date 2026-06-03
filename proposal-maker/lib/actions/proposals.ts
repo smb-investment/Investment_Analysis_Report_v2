@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, getSessionContext } from "@/lib/auth";
 
 export type ProposalStatus = "input" | "generating" | "ready" | "delivered";
 
@@ -22,6 +22,8 @@ export type Proposal = {
   notes: string | null;
   status: ProposalStatus;
   pptx_path: string | null;
+  md_path: string | null;
+  html_path: string | null;
   source_attachments: string[];
   model_used: string | null;
   error_message: string | null;
@@ -55,7 +57,31 @@ export async function createProposal(formData: FormData): Promise<void> {
     .select("id")
     .single();
   if (error || !data) redirect("/admin/proposals/new?error=" + encodeURIComponent(error?.message ?? "생성 실패"));
-  redirect(`/admin/proposals/${data.id}`);
+
+  const proposalId = data.id;
+
+  // Handle file attachments
+  const files = formData.getAll("attachments") as File[];
+  const validFiles = files.filter((f) => f && f.size > 0);
+  if (validFiles.length > 0) {
+    const storagePaths: string[] = [];
+    for (const file of validFiles) {
+      const storagePath = `${proposalId}/${file.name}`;
+      const buf = Buffer.from(await file.arrayBuffer());
+      const { error: upErr } = await supabase.storage
+        .from("proposals-attachments")
+        .upload(storagePath, buf, { contentType: file.type || "application/octet-stream", upsert: true });
+      if (!upErr) storagePaths.push(storagePath);
+    }
+    if (storagePaths.length > 0) {
+      await supabase
+        .from("proposals")
+        .update({ source_attachments: storagePaths })
+        .eq("id", proposalId);
+    }
+  }
+
+  redirect(`/admin/proposals/${proposalId}`);
 }
 
 export async function startGeneration(proposalId: string): Promise<void> {
@@ -94,5 +120,13 @@ export async function getProposalDownloadUrl(pptxPath: string): Promise<string |
   if (ctx.error) return null;
   const supabase = createSupabaseServerClient();
   const { data } = await supabase.storage.from("proposals-pptx").createSignedUrl(pptxPath, 3600);
+  return data?.signedUrl ?? null;
+}
+
+export async function getSignedUrl(bucket: string, path: string): Promise<string | null> {
+  const { profile } = await getSessionContext();
+  if (profile?.status !== "approved") return null;
+  const supabase = createSupabaseServerClient();
+  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
   return data?.signedUrl ?? null;
 }

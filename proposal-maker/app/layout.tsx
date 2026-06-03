@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { user, profile } = await getSessionContext();
-  const isAdmin = profile?.role === "admin" && profile?.status === "approved";
+  const isApproved = profile?.status === "approved";
+  const isAdmin = isApproved && profile?.role === "admin";
 
   return (
     <html lang="ko">
@@ -22,6 +23,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               SMB 투자요청서 Generator
             </Link>
             <div className="flex items-center gap-5 text-sm">
+              {isApproved && <Link href="/proposals" className="hover:text-[#6B7FA3]">보고서</Link>}
               {isAdmin && <Link href="/admin" className="hover:text-[#6B7FA3] font-medium">어드민</Link>}
               {user ? (
                 <>

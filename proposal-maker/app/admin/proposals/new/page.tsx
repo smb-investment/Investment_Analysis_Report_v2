@@ -81,11 +81,23 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
           <label className="block text-sm font-medium mb-1">추가 메모 (에이전트 참고용)</label>
           <textarea name="notes" rows={2} className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#6B7FA3] resize-none" />
         </div>
+        <div>
+          <h2 className="font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-100">첨부파일 (선택)</h2>
+          <label className="block text-sm font-medium mb-1">PDF / MD / Excel 파일 업로드</label>
+          <input
+            type="file"
+            name="attachments"
+            multiple
+            accept=".pdf,.md,.xlsx,.docx,.pptx"
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#6B7FA3]/10 file:text-[#6B7FA3] hover:file:bg-[#6B7FA3]/20"
+          />
+          <p className="text-xs text-gray-400 mt-1">업로드한 파일을 분석하여 투자요청서를 자동 작성합니다. (최대 10개)</p>
+        </div>
         <div className="pt-2">
           <button type="submit" className="w-full py-3 bg-[#6B7FA3] text-white font-medium rounded-lg hover:bg-[#5a6e91] transition">
             요청서 생성 →
           </button>
-          <p className="text-xs text-gray-400 mt-2 text-center">생성 후 첨부파일을 업로드하고 [생성 시작]을 클릭하면 PPTX가 자동으로 만들어집니다.</p>
+          <p className="text-xs text-gray-400 mt-2 text-center">생성 후 [생성 시작]을 클릭하면 PPTX가 자동으로 만들어집니다.</p>
         </div>
       </form>
     </section>

@@ -8,7 +8,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { spawnSync } from "child_process";
-import { writeFileSync, appendFileSync } from "fs";
+import { writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -30,7 +30,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
-  appendFileSync(LOG, line);
   process.stdout.write(line);
 }
 

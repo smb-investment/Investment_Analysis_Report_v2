@@ -15,13 +15,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "profiles: self read"   ON public.profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "profiles: admin read"  ON public.profiles FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.status = 'approved')
-);
-CREATE POLICY "profiles: admin update" ON public.profiles FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin' AND p.status = 'approved')
-);
+-- profiles: self read — 본인 프로필 조회 허용
+CREATE POLICY "profiles: self read" ON public.profiles FOR SELECT USING (auth.uid() = id);
+-- 어드민 정책은 무한 재귀를 피하기 위해 schema.sql의 SECURITY DEFINER 함수(is_admin())로 처리
+-- "profiles: admin read" / "profiles: admin update" 는 의도적으로 제외
 
 -- proposals: 투자요청서 레코드
 CREATE TABLE IF NOT EXISTS public.proposals (

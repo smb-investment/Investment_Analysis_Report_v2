@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { startGeneration, setProposalStatus, deleteProposal, getProposalDownloadUrl } from "@/lib/actions/proposals";
+import { startGeneration, setProposalStatus, deleteProposal, getProposalDownloadUrl, getSignedUrl } from "@/lib/actions/proposals";
 import type { Proposal } from "@/lib/actions/proposals";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -26,8 +26,12 @@ export default async function ProposalDetailPage({ params }: { params: { id: str
   const proposal = data as Proposal;
   const st = STATUS[proposal.status] ?? { label: proposal.status, cls: "bg-gray-100 text-gray-700" };
   let downloadUrl: string | null = null;
-  if (proposal.status === "ready" && proposal.pptx_path) {
-    downloadUrl = await getProposalDownloadUrl(proposal.pptx_path);
+  let mdUrl: string | null = null;
+  let htmlUrl: string | null = null;
+  if (proposal.status === "ready" || proposal.status === "delivered") {
+    if (proposal.pptx_path) downloadUrl = await getProposalDownloadUrl(proposal.pptx_path);
+    if (proposal.md_path) mdUrl = await getSignedUrl("proposals-pptx", proposal.md_path);
+    if (proposal.html_path) htmlUrl = await getSignedUrl("proposals-pptx", proposal.html_path);
   }
   return (
     <section className="max-w-2xl">
@@ -44,17 +48,33 @@ export default async function ProposalDetailPage({ params }: { params: { id: str
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">❌ {proposal.error_message}</div>
       )}
 
-      {proposal.status === "ready" && downloadUrl && (
+      {(proposal.status === "ready" || proposal.status === "delivered") && (downloadUrl || mdUrl || htmlUrl) && (
         <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200">
-          <p className="text-sm font-medium text-green-800 mb-3">✅ PPTX 생성 완료</p>
-          <a href={downloadUrl} download className="inline-flex items-center gap-2 px-4 py-2 bg-[#7BAD8C] text-white rounded-lg hover:bg-[#6a9a7b] transition text-sm font-medium">
-            📥 PPTX 다운로드
-          </a>
-          <form action={setProposalStatus.bind(null, proposal.id, "delivered")} className="inline-block ml-3">
-            <button type="submit" className="px-4 py-2 border border-[#A89DBF] text-[#A89DBF] rounded-lg hover:bg-purple-50 text-sm transition">
-              전달 완료 표시
-            </button>
-          </form>
+          <p className="text-sm font-medium text-green-800 mb-3">✅ 생성 완료</p>
+          <div className="flex flex-wrap gap-2">
+            {downloadUrl && (
+              <a href={downloadUrl} download className="inline-flex items-center gap-2 px-4 py-2 bg-[#7BAD8C] text-white rounded-lg hover:bg-[#6a9a7b] transition text-sm font-medium">
+                📥 PPTX 다운로드
+              </a>
+            )}
+            {mdUrl && (
+              <a href={mdUrl} download className="inline-flex items-center gap-2 px-4 py-2 bg-[#6B7FA3] text-white rounded-lg hover:bg-[#5a6e91] transition text-sm font-medium">
+                📄 MD 다운로드
+              </a>
+            )}
+            {htmlUrl && (
+              <a href={htmlUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-[#A89DBF] text-white rounded-lg hover:bg-[#9789b0] transition text-sm font-medium">
+                🌐 HTML 보기
+              </a>
+            )}
+          </div>
+          {proposal.status === "ready" && (
+            <form action={setProposalStatus.bind(null, proposal.id, "delivered")} className="mt-3">
+              <button type="submit" className="px-4 py-2 border border-[#A89DBF] text-[#A89DBF] rounded-lg hover:bg-purple-50 text-sm transition">
+                전달 완료 표시
+              </button>
+            </form>
+          )}
         </div>
       )}
 
@@ -102,10 +122,16 @@ export default async function ProposalDetailPage({ params }: { params: { id: str
         )}
       </div>
 
-      <div className="mt-4 p-4 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-600">
-        <p className="font-medium mb-2">첨부파일 업로드 방법</p>
-        <p className="text-xs">Supabase Dashboard → Storage → proposals-attachments → <code className="bg-white px-1 rounded">{proposal.id}/</code> 폴더에 PDF/Excel을 업로드하세요.</p>
-      </div>
+      {proposal.source_attachments && proposal.source_attachments.length > 0 && (
+        <div className="mt-4 p-4 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-600">
+          <p className="font-medium mb-2">첨부파일 ({proposal.source_attachments.length}개)</p>
+          <ul className="space-y-1">
+            {proposal.source_attachments.map((p) => (
+              <li key={p} className="text-xs font-mono text-gray-500">{p.split("/").pop()}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-6 pt-4 border-t border-gray-200">
         <form action={deleteProposal.bind(null, proposal.id)}>
