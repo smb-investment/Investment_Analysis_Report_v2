@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --background: #F8F9FA; --foreground: #1e293b; }
+html, body { background: var(--background); color: var(--foreground); }
+body { font-family: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", ui-sans-serif, system-ui, sans-serif; }

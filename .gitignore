@@ -43,6 +43,12 @@ agent/archive/
 agent/daemon.log
 agent/daemon.pid
 
+# Proposal agent (local-only — service_role key inside, NEVER commit)
+agent/.env.proposal
+agent/proposal-inbox/
+agent/proposal-daemon.log
+agent/proposal-daemon.pid
+
 # OS
 Thumbs.db
 .env*

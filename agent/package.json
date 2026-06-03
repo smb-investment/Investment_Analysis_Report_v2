@@ -2,16 +2,21 @@
   "name": "investment-proposal-agent",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Local-only analysis agent for investment reports. Uses Supabase service_role. NEVER deploy.",
   "scripts": {
     "pull": "node --env-file=.env pull.js",
     "push": "node --env-file=.env push.js",
     "analyze": "node --env-file=.env analyze.js",
     "daemon": "node --env-file=.env daemon.js",
-    "migrate": "node --env-file=.env migrate.js"
+    "migrate": "node --env-file=.env migrate.js",
+    "proposal-daemon": "node --env-file=.env.proposal proposal-daemon.js",
+    "generate-proposal": "node --env-file=.env.proposal generate-proposal.js",
+    "build-pptx": "node build-pptx.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "pptxgenjs": "^3.12.0"
   }
 }
