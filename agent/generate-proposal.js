@@ -40,6 +40,12 @@ mkdirSync(join(workDir, "attachments"), { recursive: true });
 
 function log(msg) { console.log(`[${new Date().toISOString()}] ${msg}`); }
 
+async function logDB(phase, message) {
+  try {
+    await supabase.from("proposal_logs").insert({ proposal_id: proposalId, phase, message });
+  } catch (_) { /* 로그 실패는 무시 */ }
+}
+
 // stdin 파이프 방식: 프롬프트 내용을 claude stdin으로 직접 전달
 // → "파일 읽고 실행해" 방식 없이 지시사항이 바로 Claude에게 전달됨
 // → "실행할까요?" 확인 요청 원천 차단
@@ -154,20 +160,26 @@ async function runAnalyze() {
   // P1: Extract — 파일 참조 방식 (TEST 성공 방식)
   const extractPrompt = join(workDir, "_extract_prompt.txt");
   writeFileSync(extractPrompt, fillPrompt(join(PROMPTS, "extract.md"), vars), "utf8");
+  await logDB("P1", "PDF 추출 시작");
   const extractOk = runClaude(extractPrompt, "P1:Extract", null, 20 * 60 * 1000);
   if (!extractOk || !existsSync(join(workDir, "extraction.json"))) {
+    await logDB("P1", "❌ Extract 실패: extraction.json 미생성");
     await setStatus("input", { error_message: "P1 Extract 실패: extraction.json 미생성" });
     process.exit(1);
   }
+  await logDB("P1", "✅ PDF 추출 완료");
 
   // P2: Plan — 파일 참조 방식
   const planPrompt = join(workDir, "_plan_prompt.txt");
   writeFileSync(planPrompt, fillPrompt(join(PROMPTS, "plan.md"), vars), "utf8");
+  await logDB("P2", "슬라이드 기획안 작성 시작");
   const planOk = runClaude(planPrompt, "P2:Plan", null, 15 * 60 * 1000);
   if (!planOk || !existsSync(join(workDir, "plan.md"))) {
+    await logDB("P2", "❌ Plan 실패: plan.md 미생성");
     await setStatus("input", { error_message: "P2 Plan 실패: plan.md 미생성" });
     process.exit(1);
   }
+  await logDB("P2", "✅ 기획안 완료 → 검토 후 승인하세요");
 
   // plan.md 내용을 DB에 저장 → 사이트에서 표시
   const planMd = readFileSync(join(workDir, "plan.md"), "utf8");
@@ -199,23 +211,28 @@ async function runGenerate() {
   // P3: Write — 파일 참조 방식
   const writePrompt = join(workDir, "_write_prompt.txt");
   writeFileSync(writePrompt, fillPrompt(join(PROMPTS, "write.md"), vars), "utf8");
+  await logDB("P3", "투자요청서 본문 작성 시작");
   const writeOk = runClaude(writePrompt, "P3:Write", null, 25 * 60 * 1000);
   if (!writeOk || !existsSync(join(workDir, "slides.json"))) {
+    await logDB("P3", "❌ Write 실패: slides.json 미생성");
     await setStatus("planning", { error_message: "P3 Write 실패: slides.json 미생성" });
     process.exit(1);
   }
+  await logDB("P3", "✅ 본문 작성 완료");
 
   // P4: QA — 파일 참조 방식
   let qaPass = false;
   for (let attempt = 1; attempt <= 2; attempt++) {
     const qaPrompt = join(workDir, `_qa_prompt_${attempt}.txt`);
     writeFileSync(qaPrompt, fillPrompt(join(PROMPTS, "qa.md"), vars), "utf8");
+    await logDB("P4", `QA 검수 시작 (${attempt}회차)`);
     const qaOk = runClaude(qaPrompt, `P4:QA(${attempt})`, null, 10 * 60 * 1000);
 
     const qaReport = parseQaReport();
-    if (!qaReport) { log(`⚠️ QA ${attempt}회차 파싱 실패 — 계속 진행`); break; }
+    if (!qaReport) { log(`⚠️ QA ${attempt}회차 파싱 실패 — 계속 진행`); await logDB("P4", `⚠️ QA ${attempt}회차 파싱 실패 — 계속 진행`); break; }
 
     log(`QA 점수: ${qaReport.overall_score}점 / ${qaReport.overall_pass ? "PASS" : "FAIL"}`);
+    await logDB("P4", `QA 점수: ${qaReport.overall_score}점 / ${qaReport.overall_pass ? "PASS" : "FAIL"}`);
     if (qaReport.overall_pass) { qaPass = true; break; }
   }
 
@@ -226,16 +243,19 @@ async function runGenerate() {
   const mdPath   = join(workDir, mdFileName);
   const htmlPath = join(workDir, "proposal.html");
 
+  await logDB("P5", "PPTX 빌드 시작");
   const buildResult = spawnSync(
     "node",
     [join(__dirname, "build-pptx.js"), join(workDir, "slides.json"), pptxPath],
     { cwd: ROOT, stdio: "inherit", timeout: 5 * 60 * 1000 }
   );
   if (buildResult.status !== 0) {
+    await logDB("P5", "❌ PPTX 빌드 실패");
     await setStatus("planning", { error_message: "P5 PPTX 빌드 실패" });
     process.exit(1);
   }
   log("✅ PPTX built");
+  await logDB("P5", "✅ PPTX 빌드 완료");
 
   if (existsSync(mdPath)) {
     const mdContent = readFileSync(mdPath, "utf8");
@@ -250,8 +270,9 @@ async function runGenerate() {
       contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       upsert: true,
     });
-  if (upPptxErr) { log(`❌ PPTX upload failed: ${upPptxErr.message}`); process.exit(1); }
+  if (upPptxErr) { log(`❌ PPTX upload failed: ${upPptxErr.message}`); await logDB("P5", `❌ PPTX 업로드 실패: ${upPptxErr.message}`); process.exit(1); }
   log("✅ PPTX uploaded");
+  await logDB("P5", "✅ PPTX 업로드 완료");
 
   let mdStoragePath = null;
   if (existsSync(mdPath)) {
@@ -275,6 +296,7 @@ async function runGenerate() {
     else log("✅ HTML uploaded");
   }
 
+  await logDB("P5", `✅ 생성 완료 — QA: ${finalQa?.overall_score ?? "?"}점`);
   await setStatus("ready", {
     pptx_path: pptxStoragePath,
     md_path: mdStoragePath,

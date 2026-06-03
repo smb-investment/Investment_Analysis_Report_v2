@@ -8,7 +8,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { spawnSync } from "child_process";
+import { spawn } from "child_process";
 import { writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -62,22 +62,42 @@ async function processJob(job) {
   const phase = job.status === "analyzing" ? "analyze" : "generate";
   log(`▶ [${phase}] ${job.id} (${job.company_name})`);
 
-  const result = spawnSync(
-    "node",
-    ["--env-file=agent/.env.proposal", "agent/generate-proposal.js", job.id, phase],
-    { cwd: ROOT, stdio: "inherit", timeout: 40 * 60 * 1000 }
-  );
+  const exitCode = await new Promise((resolve) => {
+    const child = spawn(
+      "node",
+      ["--env-file=agent/.env.proposal", "agent/generate-proposal.js", job.id, phase],
+      { cwd: ROOT, stdio: "pipe" }
+    );
 
-  if (result.error) {
-    log(`❌ spawn error: ${result.error.message}`);
-    const rollback = job.status === "analyzing" ? "input" : "planning";
-    await supabase.from("proposals")
-      .update({ status: rollback, error_message: result.error.message })
-      .eq("id", job.id);
-  } else if (result.status === 0) {
+    // 출력을 그대로 데몬 stdout/stderr로 전달 (파일 로그 유지)
+    child.stdout.on("data", (chunk) => process.stdout.write(chunk));
+    child.stderr.on("data", (chunk) => process.stderr.write(chunk));
+
+    const timer = setTimeout(() => {
+      log(`⏱ timeout (40m): killing ${job.id}`);
+      child.kill("SIGKILL");
+      resolve(1);
+    }, 40 * 60 * 1000);
+
+    child.on("exit", (code) => {
+      clearTimeout(timer);
+      resolve(code ?? 1);
+    });
+
+    child.on("error", (err) => {
+      log(`❌ spawn error: ${err.message}`);
+      clearTimeout(timer);
+      resolve(1);
+    });
+  });
+
+  if (exitCode === 0) {
     log(`✅ [${phase}] ${job.id} done`);
   } else {
-    log(`❌ [${phase}] ${job.id} failed (exit=${result.status})`);
+    log(`❌ [${phase}] ${job.id} failed (exit=${exitCode})`);
+    if (exitCode === 1) {
+      // 상태는 generate-proposal.js가 이미 DB에 업데이트함
+    }
   }
 
   busy = false;

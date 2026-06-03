@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { DaemonLogViewer } from "@/components/DaemonLogViewer";
 
 export const revalidate = 30; // 30초마다 자동 갱신
 
@@ -12,12 +13,13 @@ export default async function AdminPage() {
   const supabase = createSupabaseServerClient();
 
   const [proposalsRes, pendingRes, heartbeatRes] = await Promise.all([
-    supabase.from("proposals").select("id,status").order("created_at", { ascending: false }),
+    supabase.from("proposals").select("id,status,company_name").order("created_at", { ascending: false }),
     supabase.from("profiles").select("id").eq("status", "pending"),
     supabase.from("daemon_heartbeat").select("last_seen,pid").eq("id", "proposal-daemon").maybeSingle(),
   ]);
 
   const proposals = proposalsRes.data ?? [];
+  const activeProposal = proposals.find(p => p.status === "analyzing" || p.status === "generating");
   const counts = {
     total:      proposals.length,
     input:      proposals.filter((p) => p.status === "input").length,
@@ -111,6 +113,9 @@ export default async function AdminPage() {
           전체 목록 보기 →
         </Link>
       </div>
+      {activeProposal && (
+        <DaemonLogViewer proposalId={activeProposal.id} companyName={activeProposal.company_name ?? ""} />
+      )}
     </section>
   );
 }
