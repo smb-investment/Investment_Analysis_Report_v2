@@ -41,8 +41,17 @@ mkdirSync(join(workDir, "attachments"), { recursive: true });
 function log(msg) { console.log(`[${new Date().toISOString()}] ${msg}`); }
 
 function runClaude(promptFile, label, timeoutMs = 20 * 60 * 1000) {
-  const promptRelPath = promptFile.replace(ROOT + "/", "").replace(ROOT + "\\", "");
-  const brief = `${promptRelPath} 파일을 먼저 읽고, 그 안의 지시사항을 모두 따라 작업해줘.`;
+  // 역슬래시 → 슬래시 변환 (Claude Read tool 경로 호환)
+  const promptRelPath = promptFile
+    .replace(ROOT + "/", "")
+    .replace(ROOT + "\\", "")
+    .replace(/\\/g, "/");
+  // 명확한 실행 지시 — 설명 응답 방지
+  const brief = [
+    `[EXECUTE NOW] Read file: ${promptRelPath}`,
+    `Then immediately execute ALL steps in that file using your tools.`,
+    `Use Write tool to create ALL output files specified. Do NOT describe or summarize — just execute.`,
+  ].join(" ");
   log(`▶ Claude [${label}] 시작...`);
   const r = spawnSync(
     "claude",
