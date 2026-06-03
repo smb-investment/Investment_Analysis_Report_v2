@@ -46,12 +46,13 @@ function runClaude(promptFile, label, timeoutMs = 20 * 60 * 1000) {
     .replace(ROOT + "/", "")
     .replace(ROOT + "\\", "")
     .replace(/\\/g, "/");
-  // 한국어 유지 (cmd.exe 괄호 파싱 버그 회피) + 파일 생성 명시
-  const brief = `${promptRelPath} 파일을 Read tool로 읽고 모든 Step을 즉시 실행하세요. Write tool로 지정 파일을 생성하세요. 설명 응답 금지.`;
+  const brief = `${promptRelPath} 파일을 Read tool로 읽고 모든 Step을 즉시 실행하세요. Write tool로 지정 파일을 생성하세요.`;
+  const systemPrompt = "You are an autonomous agent running in a pipeline. Execute all tasks immediately and completely. Never ask for confirmation. Never ask questions. Always use Write tool to create output files. Complete all steps and exit.";
   log(`▶ Claude [${label}] 시작...`);
   const r = spawnSync(
     "claude",
     ["-p", brief,
+     "-s", systemPrompt,
      "--permission-mode", "acceptEdits",
      "--add-dir", workDir,
      "--add-dir", __dirname],
