@@ -48,7 +48,7 @@ function runClaude(task, label, timeoutMs = 20 * 60 * 1000) {
      "--permission-mode", "acceptEdits",
      "--add-dir", workDir,
      "--add-dir", __dirname],
-    { cwd: ROOT, stdio: "inherit", shell: process.platform === "win32", timeout: timeoutMs }
+    { cwd: workDir, stdio: "inherit", shell: process.platform === "win32", timeout: timeoutMs }
   );
   if (r.error)       { log(`❌ [${label}] spawn error: ${r.error.message}`); return false; }
   if (r.status !== 0){ log(`❌ [${label}] exit=${r.status}`); return false; }
