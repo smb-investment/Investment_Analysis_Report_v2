@@ -63,9 +63,14 @@ export default async function ProposalDetailPage({ params }: { params: { id: str
               </a>
             )}
             {htmlUrl && (
-              <a href={htmlUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-[#A89DBF] text-white rounded-lg hover:bg-[#9789b0] transition text-sm font-medium">
-                🌐 HTML 보기
-              </a>
+              <>
+                <a href={htmlUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-[#A89DBF] text-white rounded-lg hover:bg-[#9789b0] transition text-sm font-medium">
+                  🌐 HTML 보기
+                </a>
+                <a href={`${htmlUrl}?download=1`} download className="inline-flex items-center gap-2 px-4 py-2 bg-[#A89DBF] text-white rounded-lg hover:bg-[#9789b0] transition text-sm font-medium">
+                  📄 HTML 다운로드
+                </a>
+              </>
             )}
           </div>
           {proposal.status === "ready" && (
