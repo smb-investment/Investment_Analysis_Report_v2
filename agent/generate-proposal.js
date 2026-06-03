@@ -40,55 +40,27 @@ mkdirSync(join(workDir, "attachments"), { recursive: true });
 
 function log(msg) { console.log(`[${new Date().toISOString()}] ${msg}`); }
 
-/**
- * Claude를 실행하고 stdout 출력을 캡처한다.
- * Claude가 파일을 직접 쓰지 않고 출력만 하면 Node.js가 파일로 저장한다.
- * → 파일 저장 권한 요청 문제 완전 우회
- */
-function runClaude(task, label, outputFile, timeoutMs = 25 * 60 * 1000) {
+// TEST 케이스에서 실제로 작동했던 방식 그대로 유지
+// cwd:ROOT + acceptEdits + stdio:inherit + 파일참조 brief
+function runClaude(promptFile, label, _unused, timeoutMs = 25 * 60 * 1000) {
+  const promptRelPath = promptFile
+    .replace(ROOT + "/", "").replace(ROOT + "\\", "")
+    .replace(/\\/g, "/");
+  const brief = `${promptRelPath} 파일을 Read tool로 읽고 모든 Step을 즉시 실행하세요. Write tool로 지정 파일을 생성하세요.`;
   log(`▶ Claude [${label}] 시작...`);
   const r = spawnSync(
     "claude",
-    ["-p", task,
-     "--dangerously-skip-permissions",
+    ["-p", brief,
+     "--permission-mode", "acceptEdits",
+     "--append-system-prompt", "Automated pipeline agent. Execute all tasks immediately. Use Write tool to create files. No confirmation needed.",
      "--add-dir", workDir,
      "--add-dir", __dirname],
-    {
-      cwd: workDir,
-      stdio: ["pipe", "pipe", "inherit"],   // stdout 캡처
-      shell: process.platform === "win32",
-      timeout: timeoutMs,
-      maxBuffer: 50 * 1024 * 1024,          // 50MB
-    }
+    { cwd: ROOT, stdio: "inherit", shell: process.platform === "win32", timeout: timeoutMs }
   );
-  if (r.error) { log(`❌ [${label}] spawn error: ${r.error.message}`); return false; }
+  if (r.error)        { log(`❌ [${label}] spawn error: ${r.error.message}`); return false; }
   if (r.status !== 0) { log(`❌ [${label}] exit=${r.status}`); return false; }
-
-  const raw = r.stdout ? r.stdout.toString("utf8") : "";
-  log(`✅ [${label}] 완료 (출력 ${raw.length} chars)`);
-
-  if (!outputFile) return true;
-
-  // 출력에서 코드블록 내용 추출 (```json ... ``` 또는 ```markdown ... ```)
-  const fence = raw.match(/```(?:json|markdown|md)?\n([\s\S]+?)\n```/);
-  const content = fence ? fence[1].trim() : extractBetweenMarkers(raw);
-
-  if (!content) {
-    log(`⚠️ [${label}] 출력에서 파일 내용을 찾지 못했음 — raw 전체 저장`);
-    writeFileSync(outputFile, raw, "utf8");
-  } else {
-    writeFileSync(outputFile, content, "utf8");
-  }
-  log(`💾 저장: ${outputFile}`);
+  log(`✅ [${label}] 완료`);
   return true;
-}
-
-function extractBetweenMarkers(text) {
-  // JSON 추출 (첫 { 부터 마지막 } 까지)
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start >= 0 && end > start) return text.slice(start, end + 1);
-  return text.trim() || null;
 }
 
 function w(p) { return p.replace(/\\/g, "/"); }
@@ -178,46 +150,20 @@ async function runAnalyze() {
   const vars = { company: proposal.company_name, workDir, today, proposalId };
 
   // P1: Extract — Claude stdout 캡처 → Node.js가 파일 저장 (권한 문제 완전 우회)
-  const attachFiles = readdirSync(join(workDir, "attachments"))
-    .map(f => `${w(join(workDir,"attachments",f))}`)
-    .join(", ");
-  const extractTask = `Read these files completely: meta.json, ${attachFiles}
-Then output a single JSON object (starting with { ending with }) containing all extracted data:
-- deal_terms: funding_amount, total_cost, interest_rate, tenor_months, ltv, funding_type, use_of_proceeds
-- company_info: legal_name, reg_no, ceo_name, established, address, business_desc
-- market: market_name, market_size, cagr, pain_points (array)
-- competitive_advantage: array of {title, metric, desc, source}
-- business_model: value_chain (4 steps), revenue_streams (array)
-- financials: revenue_forecast (2027-2031 array), revenue_cagr, ebitda_margin
-- capex: phase1, phase2 each with amount, equipment, completion, target_revenue
-- risks: array of {category, desc, mitigation, severity}
-- roadmap: array of {phase, period, milestones}
-- team: ceo, coo each with name, careers array
-Each field: {"value": ..., "source": "filename p.X", "confidence": "HIGH|MED|LOW"}
-Missing data = null. No guessing. Output ONLY the JSON object, nothing else.`;
-
-  const extractionPath = join(workDir, "extraction.json");
-  const extractOk = runClaude(extractTask, "P1:Extract", extractionPath, 20 * 60 * 1000);
-  if (!extractOk || !existsSync(extractionPath)) {
+  // P1: Extract — 파일 참조 방식 (TEST 성공 방식)
+  const extractPrompt = join(workDir, "_extract_prompt.txt");
+  writeFileSync(extractPrompt, fillPrompt(join(PROMPTS, "extract.md"), vars), "utf8");
+  const extractOk = runClaude(extractPrompt, "P1:Extract", null, 20 * 60 * 1000);
+  if (!extractOk || !existsSync(join(workDir, "extraction.json"))) {
     await setStatus("input", { error_message: "P1 Extract 실패: extraction.json 미생성" });
     process.exit(1);
   }
 
-  // P2: Plan — Claude stdout 캡처 → Node.js 저장
-  const extractedData = readFileSync(extractionPath, "utf8");
-  const planTask = `Based on this extracted data:
-${extractedData.slice(0, 3000)}
-...and meta.json (${JSON.stringify(proposal).slice(0, 500)})
-
-Create a slide-by-slide investment proposal plan in Korean markdown format.
-For each slide (01-Cover through 12-Conclusion + Appendix A1-A10):
-- One "So What" headline sentence
-- Each data item marked as: [확인: source] or [추정: assumption] or [TBD: reason]
-Output ONLY the markdown content, starting with "# ${proposal.company_name} 투자요청서 기획안"`;
-
-  const planPath = join(workDir, "plan.md");
-  const planOk = runClaude(planTask, "P2:Plan", planPath, 15 * 60 * 1000);
-  if (!planOk || !existsSync(planPath)) {
+  // P2: Plan — 파일 참조 방식
+  const planPrompt = join(workDir, "_plan_prompt.txt");
+  writeFileSync(planPrompt, fillPrompt(join(PROMPTS, "plan.md"), vars), "utf8");
+  const planOk = runClaude(planPrompt, "P2:Plan", null, 15 * 60 * 1000);
+  if (!planOk || !existsSync(join(workDir, "plan.md"))) {
     await setStatus("input", { error_message: "P2 Plan 실패: plan.md 미생성" });
     process.exit(1);
   }
@@ -249,42 +195,21 @@ async function runGenerate() {
   const vars = { company: proposal.company_name, workDir, today, proposalId };
   const mdFileName = `${proposal.company_name}_Investment_Proposal.md`;
 
-  // P3: Write — stdout 캡처 방식 (두 파일 별도 실행)
-  const extractedForWrite = readFileSync(join(workDir, "extraction.json"), "utf8");
-  const planContent = readFileSync(join(workDir, "plan.md"), "utf8");
-  const slidesSchemaRef = readFileSync(join(PROMPTS, "write.md"), "utf8").slice(0, 3000);
-
-  // P3a: MD 생성
-  const writeMdTask = `Based on: extraction.json=${extractedForWrite.slice(0,2000)}, plan.md=${planContent.slice(0,2000)}
-Write a complete investment proposal in Korean markdown for ${proposal.company_name}.
-Include all 21 sections (Cover through Appendix). Use only data from extraction.json. Missing data → [TBD].
-Output ONLY the markdown starting with "# ${proposal.company_name} 투자요청서"`;
-  const mdPath = join(workDir, mdFileName);
-  const mdOk = runClaude(writeMdTask, "P3a:MD", mdPath, 20 * 60 * 1000);
-
-  // P3b: slides.json 생성
-  const writeSlidesTask = `Based on extraction.json and plan.md already read, create a slides.json for ${proposal.company_name} investment proposal.
-Schema reference: ${slidesSchemaRef.slice(0, 1500)}
-Rules: chart_data[].value must be number (not string). Missing data → "[TBD]". Arrays must meet minimum sizes (cards:6, advantages:5, risks:5, pain_points:4, revenue_streams:5, roadmap.phases:5).
-Output ONLY the JSON object starting with { "company": ...`;
-  const slidesPath = join(workDir, "slides.json");
-  const slidesOk = runClaude(writeSlidesTask, "P3b:Slides", slidesPath, 20 * 60 * 1000);
-
-  if (!slidesOk || !existsSync(slidesPath)) {
+  // P3: Write — 파일 참조 방식
+  const writePrompt = join(workDir, "_write_prompt.txt");
+  writeFileSync(writePrompt, fillPrompt(join(PROMPTS, "write.md"), vars), "utf8");
+  const writeOk = runClaude(writePrompt, "P3:Write", null, 25 * 60 * 1000);
+  if (!writeOk || !existsSync(join(workDir, "slides.json"))) {
     await setStatus("planning", { error_message: "P3 Write 실패: slides.json 미생성" });
     process.exit(1);
   }
 
-  // P4: QA — stdout 캡처
+  // P4: QA — 파일 참조 방식
   let qaPass = false;
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const slidesContent = readFileSync(slidesPath, "utf8").slice(0, 4000);
-    const qaTask = `Score this investment proposal slides.json for ${proposal.company_name}:
-${slidesContent}
-Score each slide on: A.DataGrounding(30) B.SoWhatQuality(25) C.Completeness(20) D.CrossConsistency(15) E.Style(10).
-Output ONLY a JSON object: {"overall_score":N,"overall_pass":bool,"slides":{"cover":{"score":N,"pass":bool,"issues":[],"fix_instructions":""},...},"failed_slides":[],"human_review_flags":[]}`;
-    const qaReportPath = join(workDir, "qa_report.json");
-    const qaOk = runClaude(qaTask, `P4:QA(${attempt})`, qaReportPath, 10 * 60 * 1000);
+    const qaPrompt = join(workDir, `_qa_prompt_${attempt}.txt`);
+    writeFileSync(qaPrompt, fillPrompt(join(PROMPTS, "qa.md"), vars), "utf8");
+    const qaOk = runClaude(qaPrompt, `P4:QA(${attempt})`, null, 10 * 60 * 1000);
 
     const qaReport = parseQaReport();
     if (!qaReport) { log(`⚠️ QA ${attempt}회차 파싱 실패 — 계속 진행`); break; }
