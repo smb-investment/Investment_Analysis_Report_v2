@@ -31,7 +31,7 @@ export default async function ProposalDetailPage({ params }: { params: { id: str
   if (proposal.status === "ready" || proposal.status === "delivered") {
     if (proposal.pptx_path) downloadUrl = await getProposalDownloadUrl(proposal.pptx_path);
     if (proposal.md_path) mdUrl = await getSignedUrl("proposals-md", proposal.md_path);
-    if (proposal.html_path) htmlUrl = await getSignedUrl("proposals-html", proposal.html_path);
+    if (proposal.html_path) htmlUrl = `/api/proposals/${proposal.id}/html`;
   }
   return (
     <section className="max-w-2xl">
